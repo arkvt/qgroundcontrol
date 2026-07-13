@@ -18617,8 +18617,8 @@ Confirm change?</translation>
     <name>CustomLandingMapVisual</name>
     <message>
       <location filename="../src/FlightDisplay/CustomLandingMapVisual.qml" line="41"/>
-      <source>Landing point must be at least 30 metres beyond the loiter radius.</source>
-      <translation>降落点必须至少位于盘旋半径之外 30 米。</translation>
+      <source>Landing point must remain on the fixed CLND_TAN_DIST constraint.</source>
+      <translation>降落点必须保持在 CLND_TAN_DIST 固定距离约束圆上。</translation>
     </message>
     <message>
       <location filename="../src/FlightDisplay/CustomLandingMapVisual.qml" line="317"/>
@@ -18651,7 +18651,7 @@ Confirm change?</translation>
     <message><source>Communicating with the vehicle. Keep the aircraft in Custom Landing mode.</source><translation>正在与飞控通信，请保持自定义降落模式。</translation></message>
     <message><source>Click the map to set the loiter descent point.</source><translation>单击地图设置盘旋降高点。</translation></message>
     <message><source>Click the map to set the vertical landing point.</source><translation>单击地图设置垂直降落点。</translation></message>
-    <message><source>Drag either marker to refine the path, then review and execute.</source><translation>拖动任一标记以调整路径，然后检查并执行。</translation></message>
+    <message><source>Drag the landing marker around the loiter point to choose the approach direction, then review and execute.</source><translation>绕盘旋点拖动降落标记以选择进近方向，然后检查并执行。</translation></message>
     <message><source>Altitudes are relative to the home position.</source><translation>所有高度均为相对 Home 点高度。</translation></message>
     <message><source>Not set</source><translation>未设置</translation></message>
     <message><source>Default</source><translation>默认</translation></message>
@@ -18663,6 +18663,7 @@ Confirm change?</translation>
     <message><source>Target altitude</source><translation>目标高度</translation></message>
     <message><source>m</source><translation>米</translation></message>
     <message><source>Loiter radius</source><translation>盘旋半径</translation></message>
+    <message><source>Tangent distance (CLND_TAN_DIST)</source><translation>切点至降落点距离（CLND_TAN_DIST）</translation></message>
     <message><source>Loiter direction</source><translation>盘旋方向</translation></message>
     <message><source>Clockwise</source><translation>顺时针</translation></message>
     <message><source>Counter-clockwise</source><translation>逆时针</translation></message>
@@ -18681,6 +18682,7 @@ Confirm change?</translation>
     <message><source>Loiter altitude</source><translation>盘旋高度</translation></message>
     <message><source>%1 m</source><translation>%1 米</translation></message>
     <message><source>Radius / direction</source><translation>半径/方向</translation></message>
+    <message><source>Tangent distance</source><translation>切点至降落点距离</translation></message>
     <message><source>%1 m, %2</source><translation>%1 米，%2</translation></message>
     <message><source>clockwise</source><translation>顺时针</translation></message>
     <message><source>counter-clockwise</source><translation>逆时针</translation></message>
@@ -18709,10 +18711,10 @@ Confirm change?</translation>
     <message><source>Commit status is uncertain; cancel the onboard plan before retrying</source><translation>提交状态不确定；重试前请先取消飞控中的方案</translation></message>
     <message><source>Select valid loiter and landing coordinates</source><translation>请选择有效的盘旋点和降落点坐标</translation></message>
     <message><source>Latitude and longitude cannot both be zero</source><translation>纬度和经度不能同时为零</translation></message>
-    <message><source>Altitude and loiter radius values are invalid</source><translation>高度或盘旋半径数值无效</translation></message>
+    <message><source>Altitude, loiter radius, or CLND_TAN_DIST is invalid</source><translation>高度、盘旋半径或 CLND_TAN_DIST 无效</translation></message>
     <message><source>Loiter altitude must be at least 20 metres above landing altitude</source><translation>盘旋高度必须至少比降落高度高 20 米</translation></message>
     <message><source>A Custom Landing numeric value is out of range</source><translation>自定义降落的数值超出范围</translation></message>
-    <message><source>Landing point must be at least 30 metres beyond the loiter radius</source><translation>降落点必须至少位于盘旋半径之外 30 米</translation></message>
+    <message><source>Landing point does not match the fixed CLND_TAN_DIST geometry</source><translation>降落点不符合 CLND_TAN_DIST 固定距离几何约束</translation></message>
     <message><source>Querying Custom Landing capability (%1/%2)</source><translation>正在查询自定义降落能力（%1/%2）</translation></message>
     <message><source>Sending loiter point (%1/%2)</source><translation>正在发送盘旋点（%1/%2）</translation></message>
     <message><source>Sending landing point (%1/%2)</source><translation>正在发送降落点（%1/%2）</translation></message>

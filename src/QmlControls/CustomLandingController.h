@@ -10,11 +10,14 @@
 #pragma once
 
 #include <QtCore/QObject>
+#include <QtCore/QPointer>
 #include <QtPositioning/QGeoCoordinate>
 
 #include <limits>
 
 class Vehicle;
+class Fact;
+class ParameterManager;
 struct CustomLandingCommandContext;
 
 /// Coordinates upload controller for ArduPlane Custom Landing mode.
@@ -35,6 +38,7 @@ class CustomLandingController : public QObject
     Q_PROPERTY(double loiterAltitude READ loiterAltitude WRITE setLoiterAltitude NOTIFY loiterAltitudeChanged)
     Q_PROPERTY(double landingAltitude READ landingAltitude WRITE setLandingAltitude NOTIFY landingAltitudeChanged)
     Q_PROPERTY(double loiterRadius READ loiterRadius WRITE setLoiterRadius NOTIFY loiterRadiusChanged)
+    Q_PROPERTY(double tangentDistance READ tangentDistance NOTIFY tangentDistanceChanged)
     Q_PROPERTY(double approachAirspeed READ approachAirspeed WRITE setApproachAirspeed NOTIFY approachAirspeedChanged)
     Q_PROPERTY(bool clockwise READ clockwise WRITE setClockwise NOTIFY clockwiseChanged)
 
@@ -65,6 +69,7 @@ public:
     void setLandingAltitude(double altitude);
     double loiterRadius() const { return _loiterRadius; }
     void setLoiterRadius(double radius);
+    double tangentDistance() const { return _tangentDistance; }
     double approachAirspeed() const { return _approachAirspeed; }
     void setApproachAirspeed(double airspeed);
     bool clockwise() const { return _clockwise; }
@@ -92,6 +97,7 @@ signals:
     void loiterAltitudeChanged();
     void landingAltitudeChanged();
     void loiterRadiusChanged();
+    void tangentDistanceChanged();
     void approachAirspeedChanged();
     void clockwiseChanged();
     void busyChanged();
@@ -159,6 +165,12 @@ private:
     void _setErrorText(const QString& text);
     void _setPlanIdentity(quint32 planId, quint16 crc);
     void _draftChanged();
+    void _refreshTangentDistanceParameter();
+    void _setTangentDistanceFromVehicle(double distance);
+    void _applyPendingTangentDistance();
+    double _landingOrbitDistance() const;
+    QGeoCoordinate _projectLandingAtBearing(double bearing) const;
+    QGeoCoordinate _constrainLandingCoordinate(const QGeoCoordinate& coordinate) const;
     bool _validateDraft(QString& error) const;
     PlanSnapshot _snapshotDraft(quint32 planId) const;
 
@@ -180,6 +192,9 @@ private:
     double _loiterAltitude = 50.0;
     double _landingAltitude = 0.0;
     double _loiterRadius = 100.0;
+    double _tangentDistance = 300.0;
+    double _pendingTangentDistance = std::numeric_limits<double>::quiet_NaN();
+    bool _hasPendingTangentDistance = false;
     double _approachAirspeed = std::numeric_limits<double>::quiet_NaN();
     bool _clockwise = true;
 
@@ -192,6 +207,8 @@ private:
     QString _errorText;
     quint32 _planId = 0;
     quint16 _planCrc = 0;
+    QPointer<Fact> _tangentDistanceFact;
+    QPointer<ParameterManager> _parameterManager;
 
     Operation _operation = Operation::Idle;
     PlanSnapshot _pendingPlan;
@@ -200,7 +217,11 @@ private:
     quint64 _operationGeneration = 0;
 
     static constexpr quint32 kCustomLandingMode = 91;
-    static constexpr quint8 kProtocolVersion = 1;
+    static constexpr quint8 kProtocolVersion = 2;
     static constexpr int kMaxAttempts = 3;
     static constexpr int kRetryDelayMs = 250;
+    static constexpr double kDefaultTangentDistance = 300.0;
+    static constexpr double kMinimumTangentDistance = 30.0;
+    static constexpr double kMaximumTangentDistance = 5000.0;
+    static constexpr double kGeometryTolerance = 1.0;
 };

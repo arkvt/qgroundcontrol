@@ -57,7 +57,7 @@ Rectangle {
         if (!landingCoordinateValid) {
             return qsTr("Click the map to set the vertical landing point.")
         }
-        return qsTr("Drag either marker to refine the path, then review and execute.")
+        return qsTr("Drag the landing marker around the loiter point to choose the approach direction, then review and execute.")
     }
 
     property var _confirmationDialog
@@ -341,6 +341,13 @@ Rectangle {
                 onValueEdited: (newValue) => controller.loiterRadius = newValue
             }
 
+            NumericFieldRow {
+                label: qsTr("Tangent distance (CLND_TAN_DIST)")
+                value: controller ? controller.tangentDistance : 300
+                units: qsTr("m")
+                editable: false
+            }
+
             RowLayout {
                 Layout.fillWidth: true
 
@@ -465,6 +472,8 @@ Rectangle {
                                                    .arg(_root.controller.clockwise ? qsTr("clockwise")
                                                                                   : qsTr("counter-clockwise"))
                     }
+                    QGCLabel { text: qsTr("Tangent distance") }
+                    QGCLabel { text: qsTr("%1 m").arg(_root._numberText(_root.controller.tangentDistance, 1)) }
                     QGCLabel { text: qsTr("Landing point") }
                     QGCLabel { text: _root._coordinateText(_root.controller.landingCoordinate) }
                     QGCLabel { text: qsTr("Landing altitude") }

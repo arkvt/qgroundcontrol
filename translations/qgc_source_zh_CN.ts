@@ -19635,8 +19635,8 @@ ROTATION_NONE 表示组件指向飞行方向。</translation>
     <name>CustomLandingMapVisual</name>
     <message>
       <location filename="../src/FlightDisplay/CustomLandingMapVisual.qml" line="41"/>
-      <source>Landing point must be at least 30 metres beyond the loiter radius.</source>
-      <translation>降落点必须至少位于盘旋半径之外 30 米。</translation>
+      <source>Landing point must remain on the fixed CLND_TAN_DIST constraint.</source>
+      <translation>降落点必须保持在 CLND_TAN_DIST 固定距离约束圆上。</translation>
     </message>
     <message>
       <location filename="../src/FlightDisplay/CustomLandingMapVisual.qml" line="317"/>
@@ -19699,8 +19699,8 @@ ROTATION_NONE 表示组件指向飞行方向。</translation>
     </message>
     <message>
       <location filename="../src/FlightDisplay/CustomLandingPanel.qml" line="62"/>
-      <source>Drag either marker to refine the path, then review and execute.</source>
-      <translation>拖动任一标记以调整路径，然后检查并执行。</translation>
+      <source>Drag the landing marker around the loiter point to choose the approach direction, then review and execute.</source>
+      <translation>绕盘旋点拖动降落标记以选择进近方向，然后检查并执行。</translation>
     </message>
     <message>
       <location filename="../src/FlightDisplay/CustomLandingPanel.qml" line="239"/>
@@ -19758,6 +19758,11 @@ ROTATION_NONE 表示组件指向飞行方向。</translation>
       <location filename="../src/FlightDisplay/CustomLandingPanel.qml" line="322"/>
       <source>Loiter radius</source>
       <translation>盘旋半径</translation>
+    </message>
+    <message>
+      <location filename="../src/FlightDisplay/CustomLandingPanel.qml" line="345"/>
+      <source>Tangent distance (CLND_TAN_DIST)</source>
+      <translation>切点至降落点距离（CLND_TAN_DIST）</translation>
     </message>
     <message>
       <location filename="../src/FlightDisplay/CustomLandingPanel.qml" line="336"/>
@@ -19850,6 +19855,11 @@ ROTATION_NONE 表示组件指向飞行方向。</translation>
       <location filename="../src/FlightDisplay/CustomLandingPanel.qml" line="449"/>
       <source>Radius / direction</source>
       <translation>半径/方向</translation>
+    </message>
+    <message>
+      <location filename="../src/FlightDisplay/CustomLandingPanel.qml" line="475"/>
+      <source>Tangent distance</source>
+      <translation>切点至降落点距离</translation>
     </message>
     <message>
       <location filename="../src/FlightDisplay/CustomLandingPanel.qml" line="451"/>
@@ -19992,8 +20002,8 @@ ROTATION_NONE 表示组件指向飞行方向。</translation>
     </message>
     <message>
       <location filename="../src/QmlControls/CustomLandingController.cc" line="486"/>
-      <source>Altitude and loiter radius values are invalid</source>
-      <translation>高度或盘旋半径数值无效</translation>
+      <source>Altitude, loiter radius, or CLND_TAN_DIST is invalid</source>
+      <translation>高度、盘旋半径或 CLND_TAN_DIST 无效</translation>
     </message>
     <message>
       <location filename="../src/QmlControls/CustomLandingController.cc" line="490"/>
@@ -20007,8 +20017,8 @@ ROTATION_NONE 表示组件指向飞行方向。</translation>
     </message>
     <message>
       <location filename="../src/QmlControls/CustomLandingController.cc" line="503"/>
-      <source>Landing point must be at least 30 metres beyond the loiter radius</source>
-      <translation>降落点必须至少位于盘旋半径之外 30 米</translation>
+      <source>Landing point does not match the fixed CLND_TAN_DIST geometry</source>
+      <translation>降落点不符合 CLND_TAN_DIST 固定距离几何约束</translation>
     </message>
     <message>
       <location filename="../src/QmlControls/CustomLandingController.cc" line="600"/>

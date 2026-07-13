@@ -32,14 +32,21 @@ Item {
     readonly property bool interactive: active && controller && controller.modeActive && controller.capabilitySupported
                                         && !controller.busy && !controller.planCommitted
     readonly property real loiterRadiusMeters: controller ? Math.max(0, Number(controller.loiterRadius)) : 0
-    readonly property real minimumApproachMarginMeters: 30
+    readonly property real tangentDistanceMeters: controller ? Number(controller.tangentDistance) : 300
+    readonly property real landingConstraintRadiusMeters: loiterRadiusMeters > 0 && tangentDistanceMeters > 0
+                                                            ? Math.sqrt(loiterRadiusMeters * loiterRadiusMeters
+                                                                        + tangentDistanceMeters * tangentDistanceMeters)
+                                                            : 0
+    readonly property real geometryToleranceMeters: 1
     readonly property real centerToLandingDistance: draftComplete
                                                         ? controller.loiterCoordinate.distanceTo(controller.landingCoordinate)
                                                         : 0
     readonly property bool geometryValid: draftComplete && loiterRadiusMeters > 0
-                                             && centerToLandingDistance > loiterRadiusMeters + minimumApproachMarginMeters
+                                             && tangentDistanceMeters >= 30 && tangentDistanceMeters <= 5000
+                                             && Math.abs(centerToLandingDistance - landingConstraintRadiusMeters)
+                                                    <= geometryToleranceMeters
     readonly property string geometryError: draftComplete && !geometryValid
-                                                ? qsTr("Landing point must be at least 30 metres beyond the loiter radius.")
+                                                ? qsTr("Landing point must remain on the fixed CLND_TAN_DIST constraint.")
                                                 : ""
     readonly property var tangentCoordinate: _calculateTangentCoordinate()
     readonly property var approachPath: geometryValid
@@ -65,9 +72,8 @@ Item {
         return normalized < 0 ? normalized + 360 : normalized
     }
 
-    // For an external point P and circle center C, the tangent radius differs
-    // from bearing(C,P) by acos(radius / distance(C,P)). The sign selects the
-    // tangent whose direction of travel points toward P.
+    // The fixed tangent length and loiter radius form a right triangle. The
+    // sign selects the tangent whose direction of travel points toward P.
     function _calculateTangentCoordinate() {
         if (!geometryValid) {
             return QtPositioning.coordinate()
@@ -75,7 +81,7 @@ Item {
 
         var center = controller.loiterCoordinate
         var landing = controller.landingCoordinate
-        var offsetDegrees = Math.acos(loiterRadiusMeters / centerToLandingDistance) * 180 / Math.PI
+        var offsetDegrees = Math.atan2(tangentDistanceMeters, loiterRadiusMeters) * 180 / Math.PI
         var centerToLandingBearing = center.azimuthTo(landing)
         var tangentBearing = controller.clockwise
                 ? centerToLandingBearing - offsetDegrees
@@ -112,6 +118,7 @@ Item {
         _landingMarker = visualObjectManager.createObject(landingMarkerComponent, map, true /* parentObjectIsMap */)
 
         visualObjectManager.createObjects([
+            landingConstraintCircleComponent,
             loiterCircleComponent,
             approachLineComponent,
             tangentMarkerComponent,
@@ -168,6 +175,19 @@ Item {
             _landingDragArea.destroy()
             _landingDragArea = undefined
         }
+    }
+
+    function _recreateLandingDragArea() {
+        if (_landingDragArea) {
+            _landingDragArea.destroy()
+            _landingDragArea = undefined
+        }
+        Qt.callLater(_syncDragAreas)
+    }
+
+    function _recreateDragAreas() {
+        _hideDragAreas()
+        Qt.callLater(_syncDragAreas)
     }
 
     function _showMapClickArea() {
@@ -274,6 +294,8 @@ Item {
                     _root.controller.loiterCoordinate = coordinate
                 }
             }
+
+            onDragStop: _root._recreateDragAreas()
         }
     }
 
@@ -294,6 +316,26 @@ Item {
                     _root.controller.landingCoordinate = coordinate
                 }
             }
+
+            // Dragging is intentionally projected onto a circle by the C++
+            // controller. Recreate this transparent handle so it snaps back
+            // onto the constrained marker after MouseArea broke its binding.
+            onDragStop: _root._recreateLandingDragArea()
+        }
+    }
+
+    Component {
+        id: landingConstraintCircleComponent
+
+        MapCircle {
+            z: QGroundControl.zOrderMapItems - 3
+            center: _root.controller ? _root.controller.loiterCoordinate : QtPositioning.coordinate()
+            radius: _root.landingConstraintRadiusMeters
+            border.width: 1
+            border.color: Qt.rgba(0.29, 0.75, 1.0, 0.72)
+            color: Qt.rgba(0.29, 0.75, 1.0, 0.035)
+            visible: _root.active && _root.loiterCoordinateValid
+                     && _root.landingConstraintRadiusMeters > 0
         }
     }
 

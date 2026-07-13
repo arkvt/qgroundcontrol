@@ -9,8 +9,10 @@
 
 #include "CustomLandingController.h"
 
+#include "Fact.h"
 #include "MAVLinkLib.h"
 #include "MultiVehicleManager.h"
+#include "ParameterManager.h"
 #include "QGCLoggingCategory.h"
 #include "Vehicle.h"
 #include "VehicleLinkManager.h"
@@ -33,6 +35,17 @@ bool fuzzyEqual(double left, double right)
     }
 
     return qFuzzyCompare(1.0 + left, 1.0 + right);
+}
+
+bool coordinatesNearlyEqual(const QGeoCoordinate& left, const QGeoCoordinate& right)
+{
+    if (!left.isValid() || !right.isValid()) {
+        return left == right;
+    }
+
+    const bool altitudeEqual = (std::isnan(left.altitude()) && std::isnan(right.altitude())) ||
+                               fuzzyEqual(left.altitude(), right.altitude());
+    return altitudeEqual && (left.distanceTo(right) < 0.01);
 }
 
 } // namespace
@@ -80,6 +93,14 @@ void CustomLandingController::setVehicle(Vehicle* vehicle)
     }
 
     _abortOperation(QString());
+    if (_tangentDistanceFact) {
+        disconnect(_tangentDistanceFact, nullptr, this, nullptr);
+        _tangentDistanceFact.clear();
+    }
+    if (_parameterManager) {
+        disconnect(_parameterManager, nullptr, this, nullptr);
+        _parameterManager.clear();
+    }
     if (_vehicle) {
         disconnect(_vehicle, nullptr, this, nullptr);
     }
@@ -88,11 +109,31 @@ void CustomLandingController::setVehicle(Vehicle* vehicle)
     _setCapabilitySupported(false);
     _setPlanCommitted(false);
     _commitUncertain = false;
+    _hasPendingTangentDistance = false;
     _setPlanIdentity(0, 0);
+
+    // Never carry a vehicle-specific geometry parameter to another vehicle.
+    // A firmware without CLND_TAN_DIST uses the protocol default of 300 m.
+    _setTangentDistanceFromVehicle(kDefaultTangentDistance);
 
     if (_vehicle) {
         connect(_vehicle, &Vehicle::flightModeChanged, this, [this](const QString&) { _flightModeChanged(); });
         connect(_vehicle, &QObject::destroyed, this, [this]() { setVehicle(nullptr); });
+
+        _parameterManager = _vehicle->parameterManager();
+        connect(_parameterManager, &ParameterManager::parametersReadyChanged, this,
+                [this](bool parametersReady) {
+                    if (parametersReady) {
+                        _refreshTangentDistanceParameter();
+                    }
+                });
+        connect(_parameterManager, &ParameterManager::factAdded, this,
+                [this](int, Fact* fact) {
+                    if (fact && fact->name() == QStringLiteral("CLND_TAN_DIST")) {
+                        _refreshTangentDistanceParameter();
+                    }
+                });
+        _refreshTangentDistanceParameter();
     }
 
     _updateModeActive();
@@ -104,22 +145,62 @@ void CustomLandingController::setVehicle(Vehicle* vehicle)
 
 void CustomLandingController::setLoiterCoordinate(const QGeoCoordinate& coordinate)
 {
-    if (_busy || _planCommitted || _commitUncertain || coordinate == _loiterCoordinate) {
+    if (_busy || _planCommitted || _commitUncertain) {
         return;
     }
 
-    _loiterCoordinate = coordinate;
-    emit loiterCoordinateChanged();
+    QGeoCoordinate newCoordinate = coordinate;
+    if (newCoordinate.isValid()) {
+        newCoordinate.setAltitude(_loiterAltitude);
+    }
+
+    double landingBearing = std::numeric_limits<double>::quiet_NaN();
+    if (_landingCoordinate.isValid()) {
+        if (_loiterCoordinate.isValid()) {
+            landingBearing = _loiterCoordinate.azimuthTo(_landingCoordinate);
+        } else if (newCoordinate.isValid()) {
+            landingBearing = newCoordinate.azimuthTo(_landingCoordinate);
+        }
+    }
+
+    const bool loiterChanged = !coordinatesNearlyEqual(newCoordinate, _loiterCoordinate);
+    if (loiterChanged) {
+        _loiterCoordinate = newCoordinate;
+    }
+
+    bool landingChanged = false;
+    if (_loiterCoordinate.isValid() && std::isfinite(landingBearing)) {
+        const QGeoCoordinate projectedLanding = _projectLandingAtBearing(landingBearing);
+        if (projectedLanding.isValid() && !coordinatesNearlyEqual(projectedLanding, _landingCoordinate)) {
+            _landingCoordinate = projectedLanding;
+            landingChanged = true;
+        }
+    }
+
+    if (!loiterChanged && !landingChanged) {
+        return;
+    }
+    if (loiterChanged) {
+        emit loiterCoordinateChanged();
+    }
+    if (landingChanged) {
+        emit landingCoordinateChanged();
+    }
     _draftChanged();
 }
 
 void CustomLandingController::setLandingCoordinate(const QGeoCoordinate& coordinate)
 {
-    if (_busy || _planCommitted || _commitUncertain || coordinate == _landingCoordinate) {
+    if (_busy || _planCommitted || _commitUncertain) {
         return;
     }
 
-    _landingCoordinate = coordinate;
+    const QGeoCoordinate constrainedCoordinate = _constrainLandingCoordinate(coordinate);
+    if (coordinatesNearlyEqual(constrainedCoordinate, _landingCoordinate)) {
+        return;
+    }
+
+    _landingCoordinate = constrainedCoordinate;
     emit landingCoordinateChanged();
     _draftChanged();
 }
@@ -152,8 +233,19 @@ void CustomLandingController::setLoiterRadius(double radius)
         return;
     }
 
+    const double landingBearing = (_loiterCoordinate.isValid() && _landingCoordinate.isValid())
+        ? _loiterCoordinate.azimuthTo(_landingCoordinate)
+        : std::numeric_limits<double>::quiet_NaN();
+
     _loiterRadius = radius;
     emit loiterRadiusChanged();
+    if (std::isfinite(landingBearing)) {
+        const QGeoCoordinate projectedLanding = _projectLandingAtBearing(landingBearing);
+        if (projectedLanding.isValid() && !coordinatesNearlyEqual(projectedLanding, _landingCoordinate)) {
+            _landingCoordinate = projectedLanding;
+            emit landingCoordinateChanged();
+        }
+    }
     _draftChanged();
 }
 
@@ -177,6 +269,121 @@ void CustomLandingController::setClockwise(bool clockwise)
     _clockwise = clockwise;
     emit clockwiseChanged();
     _draftChanged();
+}
+
+void CustomLandingController::_refreshTangentDistanceParameter()
+{
+    if (!_vehicle || !_parameterManager) {
+        return;
+    }
+
+    if (!_parameterManager->parameterExists(ParameterManager::defaultComponentId,
+                                            QStringLiteral("CLND_TAN_DIST"))) {
+        if (_parameterManager->parametersReady()) {
+            _setTangentDistanceFromVehicle(kDefaultTangentDistance);
+        }
+        return;
+    }
+
+    Fact* const fact = _parameterManager->getParameter(ParameterManager::defaultComponentId,
+                                                       QStringLiteral("CLND_TAN_DIST"));
+    if (_tangentDistanceFact != fact) {
+        if (_tangentDistanceFact) {
+            disconnect(_tangentDistanceFact, nullptr, this, nullptr);
+        }
+        _tangentDistanceFact = fact;
+        connect(fact, &Fact::rawValueChanged, this, [this](const QVariant& value) {
+            bool conversionOk = false;
+            const double distance = value.toDouble(&conversionOk);
+            _setTangentDistanceFromVehicle(conversionOk
+                                               ? distance
+                                               : std::numeric_limits<double>::quiet_NaN());
+        });
+    }
+
+    bool conversionOk = false;
+    const double distance = fact->rawValue().toDouble(&conversionOk);
+    _setTangentDistanceFromVehicle(conversionOk
+                                       ? distance
+                                       : std::numeric_limits<double>::quiet_NaN());
+}
+
+void CustomLandingController::_setTangentDistanceFromVehicle(double distance)
+{
+    if (_busy || _planCommitted || _commitUncertain) {
+        _pendingTangentDistance = distance;
+        _hasPendingTangentDistance = true;
+        return;
+    }
+
+    _hasPendingTangentDistance = false;
+    if (fuzzyEqual(distance, _tangentDistance)) {
+        return;
+    }
+
+    const double landingBearing = (_loiterCoordinate.isValid() && _landingCoordinate.isValid())
+        ? _loiterCoordinate.azimuthTo(_landingCoordinate)
+        : std::numeric_limits<double>::quiet_NaN();
+
+    _tangentDistance = distance;
+    emit tangentDistanceChanged();
+
+    if (std::isfinite(landingBearing)) {
+        const QGeoCoordinate projectedLanding = _projectLandingAtBearing(landingBearing);
+        if (projectedLanding.isValid() && !coordinatesNearlyEqual(projectedLanding, _landingCoordinate)) {
+            _landingCoordinate = projectedLanding;
+            emit landingCoordinateChanged();
+        }
+    }
+    _draftChanged();
+}
+
+void CustomLandingController::_applyPendingTangentDistance()
+{
+    if (!_hasPendingTangentDistance || _busy || _planCommitted || _commitUncertain) {
+        return;
+    }
+
+    const double distance = _pendingTangentDistance;
+    _hasPendingTangentDistance = false;
+    _setTangentDistanceFromVehicle(distance);
+}
+
+double CustomLandingController::_landingOrbitDistance() const
+{
+    if (!std::isfinite(_loiterRadius) || (_loiterRadius <= 0.0) ||
+        !std::isfinite(_tangentDistance) || (_tangentDistance <= 0.0)) {
+        return std::numeric_limits<double>::quiet_NaN();
+    }
+    return std::hypot(_loiterRadius, _tangentDistance);
+}
+
+QGeoCoordinate CustomLandingController::_projectLandingAtBearing(double bearing) const
+{
+    const double orbitDistance = _landingOrbitDistance();
+    if (!_loiterCoordinate.isValid() || !std::isfinite(bearing) || !std::isfinite(orbitDistance)) {
+        return QGeoCoordinate();
+    }
+
+    QGeoCoordinate projected = _loiterCoordinate.atDistanceAndAzimuth(orbitDistance, bearing);
+    projected.setAltitude(_landingAltitude);
+    return projected;
+}
+
+QGeoCoordinate CustomLandingController::_constrainLandingCoordinate(const QGeoCoordinate& coordinate) const
+{
+    if (!coordinate.isValid() || !_loiterCoordinate.isValid()) {
+        return coordinate;
+    }
+
+    // At the exact centre the bearing is undefined. Retain the current radial
+    // direction instead of making the marker jump north.
+    if ((_loiterCoordinate.distanceTo(coordinate) < 0.01) && _landingCoordinate.isValid()) {
+        return _landingCoordinate;
+    }
+
+    const QGeoCoordinate projected = _projectLandingAtBearing(_loiterCoordinate.azimuthTo(coordinate));
+    return projected.isValid() ? projected : coordinate;
 }
 
 bool CustomLandingController::canExecute() const
@@ -332,6 +539,7 @@ void CustomLandingController::_updateModeActive()
         }
         _setPlanCommitted(false);
         _commitUncertain = false;
+        _applyPendingTangentDistance();
         _setStateText(tr("Custom Landing mode is not active"));
     } else {
         _setPlanCommitted(false);
@@ -465,8 +673,11 @@ bool CustomLandingController::_validateDraft(QString& error) const
     }
     if (!std::isfinite(_loiterAltitude) || (_loiterAltitude <= 0.0) ||
         !std::isfinite(_landingAltitude) || !std::isfinite(_loiterRadius) ||
-        (_loiterRadius < 10.0) || (_loiterRadius > 10000.0)) {
-        error = tr("Altitude and loiter radius values are invalid");
+        (_loiterRadius < 10.0) || (_loiterRadius > 10000.0) ||
+        !std::isfinite(_tangentDistance) ||
+        (_tangentDistance < kMinimumTangentDistance) ||
+        (_tangentDistance > kMaximumTangentDistance)) {
+        error = tr("Altitude, loiter radius, or CLND_TAN_DIST is invalid");
         return false;
     }
     if ((_loiterAltitude - _landingAltitude) < 20.0) {
@@ -482,8 +693,11 @@ bool CustomLandingController::_validateDraft(QString& error) const
         error = tr("A Custom Landing numeric value is out of range");
         return false;
     }
-    if (_loiterCoordinate.distanceTo(_landingCoordinate) <= (_loiterRadius + 30.0)) {
-        error = tr("Landing point must be at least 30 metres beyond the loiter radius");
+    const double expectedCenterDistance = _landingOrbitDistance();
+    const double actualCenterDistance = _loiterCoordinate.distanceTo(_landingCoordinate);
+    if (!std::isfinite(expectedCenterDistance) || !std::isfinite(actualCenterDistance) ||
+        (std::abs(actualCenterDistance - expectedCenterDistance) > kGeometryTolerance)) {
+        error = tr("Landing point does not match the fixed CLND_TAN_DIST geometry");
         return false;
     }
 
@@ -624,7 +838,7 @@ void CustomLandingController::_sendCurrentOperation()
     case Operation::QueryCapability:
         _vehicle->sendMavCommandWithHandler(
             &handlerInfo, _vehicle->defaultComponentId(), MAV_CMD_USER_3,
-            0.0F);
+            static_cast<float>(kProtocolVersion));
         break;
     case Operation::SendLoiter:
         _vehicle->sendMavCommandIntWithHandler(
@@ -738,6 +952,7 @@ void CustomLandingController::_finishOperation()
     _operation = Operation::Idle;
     _attempt = 0;
     _setBusy(false);
+    _applyPendingTangentDistance();
 }
 
 void CustomLandingController::_finishWithError(const QString& error)
@@ -747,6 +962,7 @@ void CustomLandingController::_finishWithError(const QString& error)
     _setErrorText(error);
     _setStateText(error);
     _setBusy(false);
+    _applyPendingTangentDistance();
 }
 
 QString CustomLandingController::_commandError(Operation operation, int failureCode, int ackResult, int resultParam2) const
