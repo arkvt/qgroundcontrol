@@ -195,6 +195,8 @@
         <file alias="TuningComponentIcon.png">src/AutoPilotPlugins/Common/Images/TuningComponentIcon.png</file>
         <file alias="vehicleArrowOpaque.svg">src/FlightMap/Images/vehicleArrowOpaque.svg</file>
         <file alias="vehicleArrowOutline.svg">src/FlightMap/Images/vehicleArrowOutline.svg</file>
+        <file alias="vtolFixedWing.svg">src/FlightMap/Images/vtolFixedWing.svg</file>
+        <file alias="vtolMultiRotor.svg">src/FlightMap/Images/vtolMultiRotor.svg</file>
         <file alias="VehicleDown.png">src/AutoPilotPlugins/PX4/Images/VehicleDown.png</file>
         <file alias="VehicleDownRotate.png">src/AutoPilotPlugins/PX4/Images/VehicleDownRotate.png</file>
         <file alias="VehicleLeft.png">src/AutoPilotPlugins/PX4/Images/VehicleLeft.png</file>

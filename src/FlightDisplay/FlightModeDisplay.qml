@@ -25,7 +25,8 @@ QtObject {
         { source: "QuadPlane Land",      base: "Land" },
         { source: "QuadPlane RTL",       base: "RTL" },
         { source: "QuadPlane AutoTune",  base: "Autotune", aliases: [ "QuadPlane Autotune" ] },
-        { source: "QuadPlane Acro",      base: "Acro" }
+        { source: "QuadPlane Acro",      base: "Acro" },
+        { source: "Loiter to QLand",     base: "Loiter to QLand" }
     ]
 
     property var _modeEntries: [
@@ -246,39 +247,14 @@ QtObject {
         return ""
     }
 
-    function modeGroupRank(vehicle, mode) {
-        if (hasQuadPlaneModes(vehicle)) {
-            return isQuadPlaneMode(mode) ? 2 : 1
-        }
-
-        return 0
-    }
-
     function sortedModes(vehicle) {
-        var modes = []
+        var sorted = []
         if (!vehicle || !vehicle.flightModes) {
-            return modes
+            return sorted
         }
 
         for (var i = 0; i < vehicle.flightModes.length; i++) {
-            var mode = vehicle.flightModes[i]
-            modes.push({
-                mode: mode,
-                index: i,
-                rank: modeGroupRank(vehicle, mode)
-            })
-        }
-
-        modes.sort(function(left, right) {
-            if (left.rank !== right.rank) {
-                return left.rank - right.rank
-            }
-            return left.index - right.index
-        })
-
-        var sorted = []
-        for (var j = 0; j < modes.length; j++) {
-            sorted.push(modes[j].mode)
+            sorted.push(vehicle.flightModes[i])
         }
         return sorted
     }

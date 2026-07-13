@@ -1034,7 +1034,7 @@ private:
     double          _rcRSSIstore = 255;
     bool            _flying = false;
     bool            _landing = false;
-    bool            _vtolInFwdFlight = false;
+    bool            _vtolInFwdFlight = true;
     uint32_t        _onboardControlSensorsPresent = 0;
     uint32_t        _onboardControlSensorsEnabled = 0;
     uint32_t        _onboardControlSensorsHealth = 0;

@@ -40,6 +40,15 @@ MapQuickItem {
     property var    _map:           map
     property bool   _multiVehicle:  QGroundControl.multiVehicleManager.vehicles.count > 1
     property bool   _infoPinned:    false
+    property string _vehicleIconSource: {
+        if (_adsbVehicle) {
+            return alert ? "/qmlimages/AlertAircraft.svg" : "/qmlimages/AwarenessAircraft.svg"
+        }
+        if (vehicle.vtol) {
+            return vehicle.vtolInFwdFlight ? "/qmlimages/vtolFixedWing.svg" : "/qmlimages/vtolMultiRotor.svg"
+        }
+        return vehicle.vehicleImageOpaque
+    }
 
     QGCPalette { id: qgcPal }
 
@@ -264,7 +273,7 @@ MapQuickItem {
 
         Image {
             id:                 vehicleIcon
-            source:             _adsbVehicle ? (alert ? "/qmlimages/AlertAircraft.svg" : "/qmlimages/AwarenessAircraft.svg") : vehicle.vehicleImageOpaque
+            source:             _vehicleIconSource
             mipmap:             true
             width:              _root.size
             sourceSize.width:   _root.size

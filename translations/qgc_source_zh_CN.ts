@@ -453,7 +453,7 @@
     <message>
       <location filename="../src/FirmwarePlugin/APM/ArduCopterFirmwarePlugin.h" line="86"/>
       <source>Circle</source>
-      <translation>绕圈</translation>
+      <translation>定高绕圈</translation>
     </message>
     <message>
       <location filename="../src/FirmwarePlugin/APM/ArduCopterFirmwarePlugin.h" line="87"/>
@@ -1249,12 +1249,12 @@
     <message>
       <location filename="../src/FirmwarePlugin/APM/ArduPlaneFirmwarePlugin.h" line="68"/>
       <source>Circle</source>
-      <translation>绕圈</translation>
+      <translation>定高绕圈</translation>
     </message>
     <message>
       <location filename="../src/FirmwarePlugin/APM/ArduPlaneFirmwarePlugin.h" line="69"/>
       <source>Stabilize</source>
-      <translation>增稳</translation>
+      <translation>自稳</translation>
     </message>
     <message>
       <location filename="../src/FirmwarePlugin/APM/ArduPlaneFirmwarePlugin.h" line="70"/>
@@ -1299,7 +1299,7 @@
     <message>
       <location filename="../src/FirmwarePlugin/APM/ArduPlaneFirmwarePlugin.h" line="78"/>
       <source>Loiter</source>
-      <translation>盘旋</translation>
+      <translation>定点盘旋</translation>
     </message>
     <message>
       <location filename="../src/FirmwarePlugin/APM/ArduPlaneFirmwarePlugin.h" line="79"/>
@@ -1309,7 +1309,7 @@
     <message>
       <location filename="../src/FirmwarePlugin/APM/ArduPlaneFirmwarePlugin.h" line="80"/>
       <source>Avoid ADSB</source>
-      <translation>ADSB 避让</translation>
+      <translation>ADS-B避让</translation>
     </message>
     <message>
       <location filename="../src/FirmwarePlugin/APM/ArduPlaneFirmwarePlugin.h" line="81"/>
@@ -1319,42 +1319,42 @@
     <message>
       <location filename="../src/FirmwarePlugin/APM/ArduPlaneFirmwarePlugin.h" line="82"/>
       <source>Initializing</source>
-      <translation>初始化中</translation>
+      <translation>初始化</translation>
     </message>
     <message>
       <location filename="../src/FirmwarePlugin/APM/ArduPlaneFirmwarePlugin.h" line="83"/>
       <source>QuadPlane Stabilize</source>
-      <translation>复合翼增稳</translation>
+      <translation>Q自稳</translation>
     </message>
     <message>
       <location filename="../src/FirmwarePlugin/APM/ArduPlaneFirmwarePlugin.h" line="84"/>
       <source>QuadPlane Hover</source>
-      <translation>复合翼悬停</translation>
+      <translation>Q定高悬停</translation>
     </message>
     <message>
       <location filename="../src/FirmwarePlugin/APM/ArduPlaneFirmwarePlugin.h" line="85"/>
       <source>QuadPlane Loiter</source>
-      <translation>复合翼悬停</translation>
+      <translation>Q定点悬停</translation>
     </message>
     <message>
       <location filename="../src/FirmwarePlugin/APM/ArduPlaneFirmwarePlugin.h" line="86"/>
       <source>QuadPlane Land</source>
-      <translation>复合翼降落</translation>
+      <translation>Q降落</translation>
     </message>
     <message>
       <location filename="../src/FirmwarePlugin/APM/ArduPlaneFirmwarePlugin.h" line="87"/>
       <source>QuadPlane RTL</source>
-      <translation>复合翼返航</translation>
+      <translation>Q返航</translation>
     </message>
     <message>
       <location filename="../src/FirmwarePlugin/APM/ArduPlaneFirmwarePlugin.h" line="88"/>
       <source>QuadPlane AutoTune</source>
-      <translation>复合翼自动调参</translation>
+      <translation>Q自动调参</translation>
     </message>
     <message>
       <location filename="../src/FirmwarePlugin/APM/ArduPlaneFirmwarePlugin.h" line="89"/>
       <source>QuadPlane Acro</source>
-      <translation>复合翼特技</translation>
+      <translation>Q特技</translation>
     </message>
     <message>
       <location filename="../src/FirmwarePlugin/APM/ArduPlaneFirmwarePlugin.h" line="90"/>
@@ -1364,7 +1364,7 @@
     <message>
       <location filename="../src/FirmwarePlugin/APM/ArduPlaneFirmwarePlugin.h" line="91"/>
       <source>Loiter to QLand</source>
-      <translation>盘旋转复合翼降落</translation>
+      <translation>盘旋降高转垂降</translation>
     </message>
     <message>
       <location filename="../src/FirmwarePlugin/APM/ArduPlaneFirmwarePlugin.h" line="92"/>
@@ -6904,11 +6904,11 @@ Click Ok to start the auto-tuning process.
     </message>
     <message>
       <source>Circle</source>
-      <translation>绕圈</translation>
+      <translation>定高绕圈</translation>
     </message>
     <message>
       <source>Stabilize</source>
-      <translation>增稳</translation>
+      <translation>自稳</translation>
     </message>
     <message>
       <source>Training</source>
@@ -6948,7 +6948,7 @@ Click Ok to start the auto-tuning process.
     </message>
     <message>
       <source>Loiter</source>
-      <translation>盘旋</translation>
+      <translation>定点盘旋</translation>
     </message>
     <message>
       <source>Takeoff</source>
@@ -6956,7 +6956,7 @@ Click Ok to start the auto-tuning process.
     </message>
     <message>
       <source>Avoid ADSB</source>
-      <translation>ADSB 避让</translation>
+      <translation>ADS-B避让</translation>
     </message>
     <message>
       <source>Guided</source>
@@ -6968,7 +6968,7 @@ Click Ok to start the auto-tuning process.
     </message>
     <message>
       <source>Initializing</source>
-      <translation>初始化中</translation>
+      <translation>初始化</translation>
     </message>
     <message>
       <source>Land</source>
@@ -7016,7 +7016,7 @@ Click Ok to start the auto-tuning process.
     </message>
     <message>
       <source>Follow Target</source>
-      <translation>跟随目标</translation>
+      <translation>伴飞</translation>
     </message>
     <message>
       <source>ZigZag</source>
@@ -7044,7 +7044,7 @@ Click Ok to start the auto-tuning process.
     </message>
     <message>
       <source>Loiter to QLand</source>
-      <translation>盘旋转四旋翼降落</translation>
+      <translation>盘旋降高转垂降</translation>
     </message>
     <message>
       <source>Autoland</source>
@@ -7057,31 +7057,31 @@ Click Ok to start the auto-tuning process.
     </message>
     <message>
       <source>QuadPlane Stabilize</source>
-      <translation>四旋翼增稳</translation>
+      <translation>Q自稳</translation>
     </message>
     <message>
       <source>QuadPlane Hover</source>
-      <translation>四旋翼悬停</translation>
+      <translation>Q定高悬停</translation>
     </message>
     <message>
       <source>QuadPlane Loiter</source>
-      <translation>四旋翼悬停</translation>
+      <translation>Q定点悬停</translation>
     </message>
     <message>
       <source>QuadPlane Land</source>
-      <translation>四旋翼降落</translation>
+      <translation>Q降落</translation>
     </message>
     <message>
       <source>QuadPlane RTL</source>
-      <translation>四旋翼返航</translation>
+      <translation>Q返航</translation>
     </message>
     <message>
       <source>QuadPlane AutoTune</source>
-      <translation>四旋翼自动调参</translation>
+      <translation>Q自动调参</translation>
     </message>
     <message>
       <source>QuadPlane Acro</source>
-      <translation>四旋翼特技</translation>
+      <translation>Q特技</translation>
     </message>
   </context>
   <context>

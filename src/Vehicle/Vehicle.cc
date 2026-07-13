@@ -963,10 +963,14 @@ void Vehicle::_handleExtendedSysState(mavlink_message_t& message)
     }
 
     if (vtol()) {
-        bool vtolInFwdFlight = extendedState.vtol_state == MAV_VTOL_STATE_FW;
-        if (vtolInFwdFlight != _vtolInFwdFlight) {
-            _vtolInFwdFlight = vtolInFwdFlight;
-            emit vtolInFwdFlightChanged(vtolInFwdFlight);
+        if (extendedState.vtol_state == MAV_VTOL_STATE_FW && !_vtolInFwdFlight) {
+            _vtolInFwdFlight = true;
+            emit vtolInFwdFlightChanged(true);
+        } else if ((extendedState.vtol_state == MAV_VTOL_STATE_MC ||
+                    extendedState.vtol_state == MAV_VTOL_STATE_TRANSITION_TO_MC) &&
+                   _vtolInFwdFlight) {
+            _vtolInFwdFlight = false;
+            emit vtolInFwdFlightChanged(false);
         }
     }
 }
