@@ -49,7 +49,8 @@ Item {
     property var _mapClickArea
     property var _loiterMarker
     property var _landingMarker
-    property var _dragAreas: []
+    property var _loiterDragArea
+    property var _landingDragArea
 
     QGCDynamicObjectManager {
         id: visualObjectManager
@@ -119,7 +120,7 @@ Item {
             directionArrowTwoFortyComponent
         ], map, true /* parentObjectIsMap */)
 
-        _showDragAreas()
+        _syncDragAreas()
     }
 
     function _hideVisuals() {
@@ -130,19 +131,43 @@ Item {
         _landingMarker = undefined
     }
 
-    function _showDragAreas() {
-        if (!active || !map || _dragAreas.length > 0 || !_loiterMarker || !_landingMarker) {
+    function _syncDragAreas() {
+        if (!active || !map || !_loiterMarker || !_landingMarker) {
             return
         }
-        _dragAreas.push(loiterDragAreaComponent.createObject(map))
-        _dragAreas.push(landingDragAreaComponent.createObject(map))
+
+        // Create drag handles only after their coordinates are valid. Apart
+        // from avoiding an invalid initial map position, recreating the handle
+        // after Reset also restores bindings which MouseArea.drag necessarily
+        // breaks while moving the transparent drag item.
+        if (loiterCoordinateValid) {
+            if (!_loiterDragArea) {
+                _loiterDragArea = loiterDragAreaComponent.createObject(map)
+            }
+        } else if (_loiterDragArea) {
+            _loiterDragArea.destroy()
+            _loiterDragArea = undefined
+        }
+
+        if (landingCoordinateValid) {
+            if (!_landingDragArea) {
+                _landingDragArea = landingDragAreaComponent.createObject(map)
+            }
+        } else if (_landingDragArea) {
+            _landingDragArea.destroy()
+            _landingDragArea = undefined
+        }
     }
 
     function _hideDragAreas() {
-        for (var i = 0; i < _dragAreas.length; i++) {
-            _dragAreas[i].destroy()
+        if (_loiterDragArea) {
+            _loiterDragArea.destroy()
+            _loiterDragArea = undefined
         }
-        _dragAreas = []
+        if (_landingDragArea) {
+            _landingDragArea.destroy()
+            _landingDragArea = undefined
+        }
     }
 
     function _showMapClickArea() {
@@ -165,6 +190,7 @@ Item {
         }
 
         _showVisuals()
+        _syncDragAreas()
         if (interactive && (!loiterCoordinateValid || !landingCoordinateValid)) {
             _showMapClickArea()
         } else {
@@ -235,10 +261,14 @@ Item {
             mapControl: map
             itemIndicator: _root._loiterMarker
             itemCoordinate: _root.controller ? _root.controller.loiterCoordinate : QtPositioning.coordinate()
+            // The full-map click catcher remains active until both points are
+            // selected. Keep an existing marker above it so it can already be
+            // refined while the other point is still unset.
+            z: QGroundControl.zOrderMapItems + 30
             visible: _root.interactive && _root.loiterCoordinateValid
 
             onItemCoordinateChanged: {
-                if (Drag.active && _root.interactive) {
+                if (_root.interactive && _root._coordinateValid(itemCoordinate)) {
                     var coordinate = itemCoordinate
                     coordinate.altitude = Number(_root.controller.loiterAltitude)
                     _root.controller.loiterCoordinate = coordinate
@@ -254,10 +284,11 @@ Item {
             mapControl: map
             itemIndicator: _root._landingMarker
             itemCoordinate: _root.controller ? _root.controller.landingCoordinate : QtPositioning.coordinate()
+            z: QGroundControl.zOrderMapItems + 30
             visible: _root.interactive && _root.landingCoordinateValid
 
             onItemCoordinateChanged: {
-                if (Drag.active && _root.interactive) {
+                if (_root.interactive && _root._coordinateValid(itemCoordinate)) {
                     var coordinate = itemCoordinate
                     coordinate.altitude = Number(_root.controller.landingAltitude)
                     _root.controller.landingCoordinate = coordinate
