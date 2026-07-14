@@ -53,6 +53,10 @@ Item {
                                             ? [tangentCoordinate, controller.landingCoordinate]
                                             : []
 
+    readonly property int   loiterPathWidth:   14
+    readonly property color loiterPathColor:   "#f4b942"
+    readonly property real  loiterPathOpacity: 0.48
+
     property var _mapClickArea
     property var _loiterMarker
     property var _landingMarker
@@ -349,9 +353,10 @@ Item {
             z: QGroundControl.zOrderMapItems - 2
             center: _root.controller ? _root.controller.loiterCoordinate : QtPositioning.coordinate()
             radius: _root.loiterRadiusMeters
-            border.width: 3
-            border.color: "#f4b942"
-            color: Qt.rgba(0.96, 0.73, 0.26, 0.12)
+            border.width: _root.loiterPathWidth
+            border.color: _root.loiterPathColor
+            color: "transparent"
+            opacity: _root.loiterPathOpacity
             visible: _root.active && _root.loiterCoordinateValid && _root.loiterRadiusMeters > 0
         }
     }

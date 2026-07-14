@@ -31,6 +31,10 @@ Item {
     property bool   _itemVisualShowing: false
     property bool   _dragAreaShowing:   false
 
+    readonly property int   _loiterPathWidth:   14
+    readonly property color _loiterPathColor:   "#f4b942"
+    readonly property real  _loiterPathOpacity: 0.48
+
     signal clicked(int sequenceNumber)
 
     function hideItemVisuals() {
@@ -216,7 +220,9 @@ Item {
                 mapControl:              _root.map
                 mapCircle:               _mapCircle
                 centerDragHandleVisible: false
-                borderColor:             _missionItem.terrainCollision ? "red" : QGroundControl.globalPalette.mapMissionTrajectory
+                borderWidth:             _root._loiterPathWidth
+                borderColor:             _missionItem.terrainCollision ? "red" : _root._loiterPathColor
+                interiorOpacity:         _missionItem.terrainCollision ? 0.95 : _root._loiterPathOpacity
 
                 property bool blockSignals: false
 
