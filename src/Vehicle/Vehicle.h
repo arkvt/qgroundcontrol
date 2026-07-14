@@ -383,10 +383,9 @@ public:
     ///     @param timeoutSec Disabled motor after this amount of time
     Q_INVOKABLE void motorTest(int motor, int percent, int timeoutSecs, bool showError);
 
-    /// Sends a MANUAL_CONTROL sample for the AeroFollow preflight actuator check.
-    /// Values use the QGC joystick range of -1.0 to 1.0. The caller is
-    /// responsible for returning all axes to neutral after a short pulse.
-    Q_INVOKABLE void sendFlightCheckControl(float roll, float pitch, float yaw, float thrust);
+    /// Starts one AeroFollow preflight actuator test. Test ids 0-4 select
+    /// the fixed-wing/lift motors, and 53-58 select the control-surface actions.
+    Q_INVOKABLE bool startFlightCheckActuatorTest(int testId);
 
     enum PIDTuningTelemetryMode {
         ModeDisabled,
@@ -857,6 +856,7 @@ signals:
     void modeIndicatorsChanged          ();
     void calibrationEventReceived       (int uasid, int componentid, int severity, QSharedPointer<events::parser::ParsedEvent> event);
     void checkListStateChanged          ();
+    void flightCheckActuatorTestCommandFinished(int testId, bool accepted);
     void longitudeChanged               ();
     void currentConfigChanged           ();
     void rcRSSIChanged                  (int rcRSSI);
@@ -1005,6 +1005,9 @@ private:
     bool setFlightModeCustom            (const QString& flightMode, uint8_t* base_mode, uint32_t* custom_mode);
 
     static void _rebootCommandResultHandler(void* resultHandlerData, int compId, const mavlink_command_ack_t& ack, MavCmdResultFailureCode_t failureCode);
+    struct FlightCheckCommandAckContext;
+    static void _flightCheckCommandResultHandler(void* resultHandlerData, int compId, const mavlink_command_ack_t& ack, MavCmdResultFailureCode_t failureCode);
+    void _finishFlightCheckCommand(quint64 requestId, bool accepted);
 
     int     _id;                    ///< Mavlink system id
     int     _defaultComponentId;
@@ -1057,6 +1060,11 @@ private:
     bool            _capabilityBitsKnown                    = false;
     uint64_t        _capabilityBits                         = 0;
     CheckList       _checkListState                         = CheckListNotSetup;
+    bool            _flightCheckCommandPending              = false;
+    int             _flightCheckPendingTestId               = -1;
+    quint64         _flightCheckRequestId                    = 0;
+    QTimer          _flightCheckCommandTimeoutTimer;
+    static constexpr int _flightCheckCommandTimeoutMsecs    = 3500;
     bool            _readyToFlyAvailable                    = false;
     bool            _readyToFly                             = false;
     bool            _allSensorsHealthy                      = true;

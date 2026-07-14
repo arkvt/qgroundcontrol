@@ -20,49 +20,6 @@ Item {
     id: root
 
     property var model: listModel
-    property real _commandRoll:  0
-    property real _commandPitch: 0
-    property real _commandYaw:   0
-
-    function _sendCurrentControl() {
-        if (globals.activeVehicle) {
-            globals.activeVehicle.sendFlightCheckControl(_commandRoll, _commandPitch, _commandYaw, 0)
-        }
-    }
-
-    function _startControlPulse(roll, pitch, yaw) {
-        _commandRoll = roll
-        _commandPitch = pitch
-        _commandYaw = yaw
-        controlPulseTimer.remainingSends = 8
-        _sendCurrentControl()
-        controlPulseTimer.restart()
-    }
-
-    function _stopControlPulse() {
-        controlPulseTimer.stop()
-        if (globals.activeVehicle) {
-            globals.activeVehicle.sendFlightCheckControl(0, 0, 0, 0)
-        }
-    }
-
-    Component.onDestruction: _stopControlPulse()
-
-    Timer {
-        id:             controlPulseTimer
-        interval:       100
-        repeat:         true
-        property int remainingSends: 0
-
-        onTriggered: {
-            if (remainingSends > 0) {
-                root._sendCurrentControl()
-                remainingSends--
-            } else {
-                root._stopControlPulse()
-            }
-        }
-    }
 
     PreFlightCheckModel {
         id: listModel
@@ -143,34 +100,40 @@ Item {
             name: qsTr("Flight Control Surface Check")
 
             PreFlightCommandCheckButton {
-                name:       qsTr("14. Send climb command")
+                name:       qsTr("14. Send nose-up command")
                 manualText: qsTr("Both V-tail surfaces move outward.")
-                onCommandRequested: root._startControlPulse(0, -0.5, 0)
+                vehicle:    globals.activeVehicle
+                testId:     53
             }
             PreFlightCommandCheckButton {
-                name:       qsTr("15. Send descend command")
+                name:       qsTr("15. Send nose-down command")
                 manualText: qsTr("Both V-tail surfaces move inward.")
-                onCommandRequested: root._startControlPulse(0, 0.5, 0)
+                vehicle:    globals.activeVehicle
+                testId:     54
             }
             PreFlightCommandCheckButton {
                 name:       qsTr("16. Send roll-left command")
                 manualText: qsTr("Left aileron up; right aileron down.")
-                onCommandRequested: root._startControlPulse(-0.5, 0, 0)
+                vehicle:    globals.activeVehicle
+                testId:     55
             }
             PreFlightCommandCheckButton {
                 name:       qsTr("17. Send roll-right command")
                 manualText: qsTr("Left aileron down; right aileron up.")
-                onCommandRequested: root._startControlPulse(0.5, 0, 0)
+                vehicle:    globals.activeVehicle
+                testId:     56
             }
             PreFlightCommandCheckButton {
                 name:       qsTr("18. Send yaw-left command")
                 manualText: qsTr("Left tail surface moves upper-left; right tail surface moves lower-left.")
-                onCommandRequested: root._startControlPulse(0, 0, -0.5)
+                vehicle:    globals.activeVehicle
+                testId:     57
             }
             PreFlightCommandCheckButton {
                 name:       qsTr("19. Send yaw-right command")
                 manualText: qsTr("Left tail surface moves lower-right; right tail surface moves upper-right.")
-                onCommandRequested: root._startControlPulse(0, 0, 0.5)
+                vehicle:    globals.activeVehicle
+                testId:     58
             }
         }
 
@@ -178,9 +141,10 @@ Item {
             name: qsTr("Fixed-Wing Throttle Check")
 
             PreFlightCommandCheckButton {
-                name:               qsTr("20. Test fixed-wing throttle")
-                manualText:         qsTr("The fixed-wing motor should rotate counter-clockwise when viewed from tail to nose.")
-                commandAvailable:   false
+                name:       qsTr("20. Test fixed-wing throttle")
+                manualText: qsTr("The fixed-wing motor should rotate counter-clockwise when viewed from tail to nose.")
+                vehicle:    globals.activeVehicle
+                testId:     0
             }
         }
 
@@ -190,22 +154,26 @@ Item {
             PreFlightCommandCheckButton {
                 name:       qsTr("21. Test motor A")
                 manualText: qsTr("Front-right motor should rotate counter-clockwise.")
-                onCommandRequested: if (globals.activeVehicle) globals.activeVehicle.motorTest(1, 10, 2, true)
+                vehicle:    globals.activeVehicle
+                testId:     1
             }
             PreFlightCommandCheckButton {
                 name:       qsTr("22. Test motor B")
                 manualText: qsTr("Rear-right motor should rotate clockwise.")
-                onCommandRequested: if (globals.activeVehicle) globals.activeVehicle.motorTest(2, 10, 2, true)
+                vehicle:    globals.activeVehicle
+                testId:     2
             }
             PreFlightCommandCheckButton {
                 name:       qsTr("23. Test motor C")
                 manualText: qsTr("Rear-left motor should rotate counter-clockwise.")
-                onCommandRequested: if (globals.activeVehicle) globals.activeVehicle.motorTest(3, 10, 2, true)
+                vehicle:    globals.activeVehicle
+                testId:     3
             }
             PreFlightCommandCheckButton {
                 name:       qsTr("24. Test motor D")
                 manualText: qsTr("Front-left motor should rotate clockwise.")
-                onCommandRequested: if (globals.activeVehicle) globals.activeVehicle.motorTest(4, 10, 2, true)
+                vehicle:    globals.activeVehicle
+                testId:     4
             }
         }
 

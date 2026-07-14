@@ -18369,39 +18369,14 @@ ROTATION_NONE 表示组件指向飞行方向。</translation>
   <context>
     <name>PreFlightCommandCheckButton</name>
     <message>
-      <location filename="../src/FlightDisplay/PreFlightCommandCheckButton.qml" line="78"/>
-      <source>Confirmed</source>
-      <translation>已确认</translation>
+      <location filename="../src/FlightDisplay/PreFlightCommandCheckButton.qml" line="108"/>
+      <source>Sending</source>
+      <translation>发送中</translation>
     </message>
     <message>
-      <location filename="../src/FlightDisplay/PreFlightCommandCheckButton.qml" line="81"/>
-      <source>Command requested. Verify the action, then confirm.</source>
-      <translation>命令已发送，请核对实际动作后确认。</translation>
-    </message>
-    <message>
-      <location filename="../src/FlightDisplay/PreFlightCommandCheckButton.qml" line="82"/>
-      <source>Command mapping pending. Complete the check manually, then confirm.</source>
-      <translation>命令映射待接入，请手动完成检查后确认。</translation>
-    </message>
-    <message>
-      <location filename="../src/FlightDisplay/PreFlightCommandCheckButton.qml" line="92"/>
-      <source>Resend</source>
-      <translation>重新发送</translation>
-    </message>
-    <message>
-      <location filename="../src/FlightDisplay/PreFlightCommandCheckButton.qml" line="92"/>
+      <location filename="../src/FlightDisplay/PreFlightCommandCheckButton.qml" line="108"/>
       <source>Send</source>
-      <translation>发送命令</translation>
-    </message>
-    <message>
-      <location filename="../src/FlightDisplay/PreFlightCommandCheckButton.qml" line="103"/>
-      <source>Undo</source>
-      <translation>撤销</translation>
-    </message>
-    <message>
-      <location filename="../src/FlightDisplay/PreFlightCommandCheckButton.qml" line="103"/>
-      <source>Confirm</source>
-      <translation>确认</translation>
+      <translation>发送</translation>
     </message>
   </context>
   <context>
@@ -18595,12 +18570,12 @@ ROTATION_NONE 表示组件指向飞行方向。</translation>
       <translation>飞前检查清单-舵面检查</translation>
     </message>
     <message>
-      <source>14. Send climb command</source>
-      <translation>14. 单击“爬升”按钮</translation>
+      <source>14. Send nose-up command</source>
+      <translation>14. 发送抬头命令</translation>
     </message>
     <message>
-      <source>15. Send descend command</source>
-      <translation>15. 单击“下降”按钮</translation>
+      <source>15. Send nose-down command</source>
+      <translation>15. 发送低头命令</translation>
     </message>
     <message>
       <source>16. Send roll-left command</source>
