@@ -19635,8 +19635,8 @@ ROTATION_NONE 表示组件指向飞行方向。</translation>
     <name>CustomLandingMapVisual</name>
     <message>
       <location filename="../src/FlightDisplay/CustomLandingMapVisual.qml" line="41"/>
-      <source>Landing point must remain on the fixed CLND_TAN_DIST constraint.</source>
-      <translation>降落点必须保持在 CLND_TAN_DIST 固定距离约束圆上。</translation>
+      <source>Loiter descent point must remain on the fixed CLND_TAN_DIST constraint.</source>
+      <translation>盘旋降高点必须位于以垂直降落点为圆心、由盘旋半径和 CLND_TAN_DIST 共同计算得到的约束圆上。</translation>
     </message>
     <message>
       <location filename="../src/FlightDisplay/CustomLandingMapVisual.qml" line="317"/>
@@ -19699,8 +19699,8 @@ ROTATION_NONE 表示组件指向飞行方向。</translation>
     </message>
     <message>
       <location filename="../src/FlightDisplay/CustomLandingPanel.qml" line="62"/>
-      <source>Drag the landing marker around the loiter point to choose the approach direction, then review and execute.</source>
-      <translation>绕盘旋点拖动降落标记以选择进近方向，然后检查并执行。</translation>
+      <source>Drag the loiter marker around the vertical landing point to choose the approach direction, then review and execute.</source>
+      <translation>绕垂直降落点拖动盘旋降高标记以选择进近方向，然后检查并执行。</translation>
     </message>
     <message>
       <location filename="../src/FlightDisplay/CustomLandingPanel.qml" line="239"/>
@@ -20017,8 +20017,8 @@ ROTATION_NONE 表示组件指向飞行方向。</translation>
     </message>
     <message>
       <location filename="../src/QmlControls/CustomLandingController.cc" line="503"/>
-      <source>Landing point does not match the fixed CLND_TAN_DIST geometry</source>
-      <translation>降落点不符合 CLND_TAN_DIST 固定距离几何约束</translation>
+      <source>Loiter descent point does not match the fixed CLND_TAN_DIST geometry</source>
+      <translation>盘旋降高点不符合由盘旋半径和 CLND_TAN_DIST 共同确定的固定几何约束</translation>
     </message>
     <message>
       <location filename="../src/QmlControls/CustomLandingController.cc" line="600"/>

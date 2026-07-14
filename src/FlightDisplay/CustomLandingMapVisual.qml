@@ -33,20 +33,20 @@ Item {
                                         && !controller.busy && !controller.planCommitted
     readonly property real loiterRadiusMeters: controller ? Math.max(0, Number(controller.loiterRadius)) : 0
     readonly property real tangentDistanceMeters: controller ? Number(controller.tangentDistance) : 300
-    readonly property real landingConstraintRadiusMeters: loiterRadiusMeters > 0 && tangentDistanceMeters > 0
-                                                            ? Math.sqrt(loiterRadiusMeters * loiterRadiusMeters
-                                                                        + tangentDistanceMeters * tangentDistanceMeters)
-                                                            : 0
+    readonly property real loiterConstraintRadiusMeters: loiterRadiusMeters > 0 && tangentDistanceMeters > 0
+                                                           ? Math.sqrt(loiterRadiusMeters * loiterRadiusMeters
+                                                                       + tangentDistanceMeters * tangentDistanceMeters)
+                                                           : 0
     readonly property real geometryToleranceMeters: 1
     readonly property real centerToLandingDistance: draftComplete
                                                         ? controller.loiterCoordinate.distanceTo(controller.landingCoordinate)
                                                         : 0
     readonly property bool geometryValid: draftComplete && loiterRadiusMeters > 0
                                              && tangentDistanceMeters >= 30 && tangentDistanceMeters <= 5000
-                                             && Math.abs(centerToLandingDistance - landingConstraintRadiusMeters)
+                                             && Math.abs(centerToLandingDistance - loiterConstraintRadiusMeters)
                                                     <= geometryToleranceMeters
     readonly property string geometryError: draftComplete && !geometryValid
-                                                ? qsTr("Landing point must remain on the fixed CLND_TAN_DIST constraint.")
+                                                ? qsTr("Loiter descent point must remain on the fixed CLND_TAN_DIST constraint.")
                                                 : ""
     readonly property var tangentCoordinate: _calculateTangentCoordinate()
     readonly property var approachPath: geometryValid
@@ -118,7 +118,7 @@ Item {
         _landingMarker = visualObjectManager.createObject(landingMarkerComponent, map, true /* parentObjectIsMap */)
 
         visualObjectManager.createObjects([
-            landingConstraintCircleComponent,
+            loiterConstraintCircleComponent,
             loiterCircleComponent,
             approachLineComponent,
             tangentMarkerComponent,
@@ -177,10 +177,10 @@ Item {
         }
     }
 
-    function _recreateLandingDragArea() {
-        if (_landingDragArea) {
-            _landingDragArea.destroy()
-            _landingDragArea = undefined
+    function _recreateLoiterDragArea() {
+        if (_loiterDragArea) {
+            _loiterDragArea.destroy()
+            _loiterDragArea = undefined
         }
         Qt.callLater(_syncDragAreas)
     }
@@ -262,12 +262,12 @@ Item {
                      && (!_root.loiterCoordinateValid || !_root.landingCoordinateValid)
 
             onClicked: (mouse) => {
-                if (!_root.loiterCoordinateValid) {
-                    _root.controller.loiterCoordinate = _root._roundedMapCoordinate(
-                                Qt.point(mouse.x, mouse.y), _root.controller.loiterAltitude)
-                } else if (!_root.landingCoordinateValid) {
+                if (!_root.landingCoordinateValid) {
                     _root.controller.landingCoordinate = _root._roundedMapCoordinate(
                                 Qt.point(mouse.x, mouse.y), _root.controller.landingAltitude)
+                } else if (!_root.loiterCoordinateValid) {
+                    _root.controller.loiterCoordinate = _root._roundedMapCoordinate(
+                                Qt.point(mouse.x, mouse.y), _root.controller.loiterAltitude)
                 }
                 Qt.callLater(_root._updateInteractionObjects)
             }
@@ -295,7 +295,11 @@ Item {
                 }
             }
 
-            onDragStop: _root._recreateDragAreas()
+            // The C++ controller projects the dragged loiter point onto the
+            // fixed-radius circle around the vertical landing point. Recreate
+            // the transparent handle so it snaps back onto the marker after
+            // MouseArea.drag broke the itemCoordinate binding.
+            onDragStop: _root._recreateLoiterDragArea()
         }
     }
 
@@ -317,25 +321,24 @@ Item {
                 }
             }
 
-            // Dragging is intentionally projected onto a circle by the C++
-            // controller. Recreate this transparent handle so it snaps back
-            // onto the constrained marker after MouseArea broke its binding.
-            onDragStop: _root._recreateLandingDragArea()
+            // The landing point is the anchor. Moving it translates the
+            // constrained loiter point while preserving the approach bearing.
+            onDragStop: _root._recreateDragAreas()
         }
     }
 
     Component {
-        id: landingConstraintCircleComponent
+        id: loiterConstraintCircleComponent
 
         MapCircle {
             z: QGroundControl.zOrderMapItems - 3
-            center: _root.controller ? _root.controller.loiterCoordinate : QtPositioning.coordinate()
-            radius: _root.landingConstraintRadiusMeters
+            center: _root.controller ? _root.controller.landingCoordinate : QtPositioning.coordinate()
+            radius: _root.loiterConstraintRadiusMeters
             border.width: 1
             border.color: Qt.rgba(0.29, 0.75, 1.0, 0.72)
             color: Qt.rgba(0.29, 0.75, 1.0, 0.035)
-            visible: _root.active && _root.loiterCoordinateValid
-                     && _root.landingConstraintRadiusMeters > 0
+            visible: _root.active && _root.landingCoordinateValid
+                     && _root.loiterConstraintRadiusMeters > 0
         }
     }
 

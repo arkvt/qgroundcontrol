@@ -51,13 +51,13 @@ Rectangle {
         if (controller.busy) {
             return qsTr("Communicating with the vehicle. Keep the aircraft in Custom Landing mode.")
         }
-        if (!loiterCoordinateValid) {
-            return qsTr("Click the map to set the loiter descent point.")
-        }
         if (!landingCoordinateValid) {
             return qsTr("Click the map to set the vertical landing point.")
         }
-        return qsTr("Drag the landing marker around the loiter point to choose the approach direction, then review and execute.")
+        if (!loiterCoordinateValid) {
+            return qsTr("Click the map to set the loiter descent point.")
+        }
+        return qsTr("Drag the loiter marker around the vertical landing point to choose the approach direction, then review and execute.")
     }
 
     property var _confirmationDialog

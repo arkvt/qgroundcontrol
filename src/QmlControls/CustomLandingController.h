@@ -168,9 +168,9 @@ private:
     void _refreshTangentDistanceParameter();
     void _setTangentDistanceFromVehicle(double distance);
     void _applyPendingTangentDistance();
-    double _landingOrbitDistance() const;
-    QGeoCoordinate _projectLandingAtBearing(double bearing) const;
-    QGeoCoordinate _constrainLandingCoordinate(const QGeoCoordinate& coordinate) const;
+    double _pointSeparationDistance() const;
+    QGeoCoordinate _projectLoiterAtBearing(double bearing) const;
+    QGeoCoordinate _constrainLoiterCoordinate(const QGeoCoordinate& coordinate) const;
     bool _validateDraft(QString& error) const;
     PlanSnapshot _snapshotDraft(quint32 planId) const;
 

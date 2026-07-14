@@ -149,43 +149,13 @@ void CustomLandingController::setLoiterCoordinate(const QGeoCoordinate& coordina
         return;
     }
 
-    QGeoCoordinate newCoordinate = coordinate;
-    if (newCoordinate.isValid()) {
-        newCoordinate.setAltitude(_loiterAltitude);
-    }
-
-    double landingBearing = std::numeric_limits<double>::quiet_NaN();
-    if (_landingCoordinate.isValid()) {
-        if (_loiterCoordinate.isValid()) {
-            landingBearing = _loiterCoordinate.azimuthTo(_landingCoordinate);
-        } else if (newCoordinate.isValid()) {
-            landingBearing = newCoordinate.azimuthTo(_landingCoordinate);
-        }
-    }
-
-    const bool loiterChanged = !coordinatesNearlyEqual(newCoordinate, _loiterCoordinate);
-    if (loiterChanged) {
-        _loiterCoordinate = newCoordinate;
-    }
-
-    bool landingChanged = false;
-    if (_loiterCoordinate.isValid() && std::isfinite(landingBearing)) {
-        const QGeoCoordinate projectedLanding = _projectLandingAtBearing(landingBearing);
-        if (projectedLanding.isValid() && !coordinatesNearlyEqual(projectedLanding, _landingCoordinate)) {
-            _landingCoordinate = projectedLanding;
-            landingChanged = true;
-        }
-    }
-
-    if (!loiterChanged && !landingChanged) {
+    const QGeoCoordinate constrainedCoordinate = _constrainLoiterCoordinate(coordinate);
+    if (coordinatesNearlyEqual(constrainedCoordinate, _loiterCoordinate)) {
         return;
     }
-    if (loiterChanged) {
-        emit loiterCoordinateChanged();
-    }
-    if (landingChanged) {
-        emit landingCoordinateChanged();
-    }
+
+    _loiterCoordinate = constrainedCoordinate;
+    emit loiterCoordinateChanged();
     _draftChanged();
 }
 
@@ -195,13 +165,45 @@ void CustomLandingController::setLandingCoordinate(const QGeoCoordinate& coordin
         return;
     }
 
-    const QGeoCoordinate constrainedCoordinate = _constrainLandingCoordinate(coordinate);
-    if (coordinatesNearlyEqual(constrainedCoordinate, _landingCoordinate)) {
-        return;
+    QGeoCoordinate newCoordinate = coordinate;
+    if (newCoordinate.isValid()) {
+        newCoordinate.setAltitude(_landingAltitude);
     }
 
-    _landingCoordinate = constrainedCoordinate;
-    emit landingCoordinateChanged();
+    // The vertical landing point is the geometry anchor. Moving it translates
+    // the loiter descent point while preserving the selected approach bearing.
+    double loiterBearing = std::numeric_limits<double>::quiet_NaN();
+    if (_loiterCoordinate.isValid()) {
+        if (_landingCoordinate.isValid()) {
+            loiterBearing = _landingCoordinate.azimuthTo(_loiterCoordinate);
+        } else if (newCoordinate.isValid() && (newCoordinate.distanceTo(_loiterCoordinate) >= 0.01)) {
+            loiterBearing = newCoordinate.azimuthTo(_loiterCoordinate);
+        }
+    }
+
+    const bool landingChanged = !coordinatesNearlyEqual(newCoordinate, _landingCoordinate);
+    if (landingChanged) {
+        _landingCoordinate = newCoordinate;
+    }
+
+    bool loiterChanged = false;
+    if (_landingCoordinate.isValid() && std::isfinite(loiterBearing)) {
+        const QGeoCoordinate projectedLoiter = _projectLoiterAtBearing(loiterBearing);
+        if (projectedLoiter.isValid() && !coordinatesNearlyEqual(projectedLoiter, _loiterCoordinate)) {
+            _loiterCoordinate = projectedLoiter;
+            loiterChanged = true;
+        }
+    }
+
+    if (!landingChanged && !loiterChanged) {
+        return;
+    }
+    if (landingChanged) {
+        emit landingCoordinateChanged();
+    }
+    if (loiterChanged) {
+        emit loiterCoordinateChanged();
+    }
     _draftChanged();
 }
 
@@ -233,17 +235,17 @@ void CustomLandingController::setLoiterRadius(double radius)
         return;
     }
 
-    const double landingBearing = (_loiterCoordinate.isValid() && _landingCoordinate.isValid())
-        ? _loiterCoordinate.azimuthTo(_landingCoordinate)
+    const double loiterBearing = (_loiterCoordinate.isValid() && _landingCoordinate.isValid())
+        ? _landingCoordinate.azimuthTo(_loiterCoordinate)
         : std::numeric_limits<double>::quiet_NaN();
 
     _loiterRadius = radius;
     emit loiterRadiusChanged();
-    if (std::isfinite(landingBearing)) {
-        const QGeoCoordinate projectedLanding = _projectLandingAtBearing(landingBearing);
-        if (projectedLanding.isValid() && !coordinatesNearlyEqual(projectedLanding, _landingCoordinate)) {
-            _landingCoordinate = projectedLanding;
-            emit landingCoordinateChanged();
+    if (std::isfinite(loiterBearing)) {
+        const QGeoCoordinate projectedLoiter = _projectLoiterAtBearing(loiterBearing);
+        if (projectedLoiter.isValid() && !coordinatesNearlyEqual(projectedLoiter, _loiterCoordinate)) {
+            _loiterCoordinate = projectedLoiter;
+            emit loiterCoordinateChanged();
         }
     }
     _draftChanged();
@@ -321,18 +323,18 @@ void CustomLandingController::_setTangentDistanceFromVehicle(double distance)
         return;
     }
 
-    const double landingBearing = (_loiterCoordinate.isValid() && _landingCoordinate.isValid())
-        ? _loiterCoordinate.azimuthTo(_landingCoordinate)
+    const double loiterBearing = (_loiterCoordinate.isValid() && _landingCoordinate.isValid())
+        ? _landingCoordinate.azimuthTo(_loiterCoordinate)
         : std::numeric_limits<double>::quiet_NaN();
 
     _tangentDistance = distance;
     emit tangentDistanceChanged();
 
-    if (std::isfinite(landingBearing)) {
-        const QGeoCoordinate projectedLanding = _projectLandingAtBearing(landingBearing);
-        if (projectedLanding.isValid() && !coordinatesNearlyEqual(projectedLanding, _landingCoordinate)) {
-            _landingCoordinate = projectedLanding;
-            emit landingCoordinateChanged();
+    if (std::isfinite(loiterBearing)) {
+        const QGeoCoordinate projectedLoiter = _projectLoiterAtBearing(loiterBearing);
+        if (projectedLoiter.isValid() && !coordinatesNearlyEqual(projectedLoiter, _loiterCoordinate)) {
+            _loiterCoordinate = projectedLoiter;
+            emit loiterCoordinateChanged();
         }
     }
     _draftChanged();
@@ -349,7 +351,7 @@ void CustomLandingController::_applyPendingTangentDistance()
     _setTangentDistanceFromVehicle(distance);
 }
 
-double CustomLandingController::_landingOrbitDistance() const
+double CustomLandingController::_pointSeparationDistance() const
 {
     if (!std::isfinite(_loiterRadius) || (_loiterRadius <= 0.0) ||
         !std::isfinite(_tangentDistance) || (_tangentDistance <= 0.0)) {
@@ -358,32 +360,36 @@ double CustomLandingController::_landingOrbitDistance() const
     return std::hypot(_loiterRadius, _tangentDistance);
 }
 
-QGeoCoordinate CustomLandingController::_projectLandingAtBearing(double bearing) const
+QGeoCoordinate CustomLandingController::_projectLoiterAtBearing(double bearing) const
 {
-    const double orbitDistance = _landingOrbitDistance();
-    if (!_loiterCoordinate.isValid() || !std::isfinite(bearing) || !std::isfinite(orbitDistance)) {
+    const double separationDistance = _pointSeparationDistance();
+    if (!_landingCoordinate.isValid() || !std::isfinite(bearing) || !std::isfinite(separationDistance)) {
         return QGeoCoordinate();
     }
 
-    QGeoCoordinate projected = _loiterCoordinate.atDistanceAndAzimuth(orbitDistance, bearing);
-    projected.setAltitude(_landingAltitude);
+    QGeoCoordinate projected = _landingCoordinate.atDistanceAndAzimuth(separationDistance, bearing);
+    projected.setAltitude(_loiterAltitude);
     return projected;
 }
 
-QGeoCoordinate CustomLandingController::_constrainLandingCoordinate(const QGeoCoordinate& coordinate) const
+QGeoCoordinate CustomLandingController::_constrainLoiterCoordinate(const QGeoCoordinate& coordinate) const
 {
-    if (!coordinate.isValid() || !_loiterCoordinate.isValid()) {
-        return coordinate;
+    QGeoCoordinate constrainedCoordinate = coordinate;
+    if (constrainedCoordinate.isValid()) {
+        constrainedCoordinate.setAltitude(_loiterAltitude);
+    }
+    if (!constrainedCoordinate.isValid() || !_landingCoordinate.isValid()) {
+        return constrainedCoordinate;
     }
 
-    // At the exact centre the bearing is undefined. Retain the current radial
-    // direction instead of making the marker jump north.
-    if ((_loiterCoordinate.distanceTo(coordinate) < 0.01) && _landingCoordinate.isValid()) {
-        return _landingCoordinate;
+    // At the exact landing point the bearing is undefined. Retain the current
+    // radial direction instead of making the loiter marker jump north.
+    if ((_landingCoordinate.distanceTo(constrainedCoordinate) < 0.01) && _loiterCoordinate.isValid()) {
+        return _loiterCoordinate;
     }
 
-    const QGeoCoordinate projected = _projectLandingAtBearing(_loiterCoordinate.azimuthTo(coordinate));
-    return projected.isValid() ? projected : coordinate;
+    const QGeoCoordinate projected = _projectLoiterAtBearing(_landingCoordinate.azimuthTo(constrainedCoordinate));
+    return projected.isValid() ? projected : constrainedCoordinate;
 }
 
 bool CustomLandingController::canExecute() const
@@ -693,11 +699,11 @@ bool CustomLandingController::_validateDraft(QString& error) const
         error = tr("A Custom Landing numeric value is out of range");
         return false;
     }
-    const double expectedCenterDistance = _landingOrbitDistance();
+    const double expectedCenterDistance = _pointSeparationDistance();
     const double actualCenterDistance = _loiterCoordinate.distanceTo(_landingCoordinate);
     if (!std::isfinite(expectedCenterDistance) || !std::isfinite(actualCenterDistance) ||
         (std::abs(actualCenterDistance - expectedCenterDistance) > kGeometryTolerance)) {
-        error = tr("Landing point does not match the fixed CLND_TAN_DIST geometry");
+        error = tr("Loiter descent point does not match the fixed CLND_TAN_DIST geometry");
         return false;
     }
 
