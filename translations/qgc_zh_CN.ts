@@ -10397,6 +10397,11 @@ Click Ok to start the auto-tuning process.
   <context>
     <name>MissionController</name>
     <message>
+      <location filename="../src/MissionManager/MissionController.cc" line="55"/>
+      <source>Distance from takeoff to first waypoint or loiter point</source>
+      <translation>起飞点到第一航点或盘旋点的距离</translation>
+    </message>
+    <message>
       <location filename="../src/MissionManager/MissionController.cc" line="788"/>
       <source>Mission item %1 is not an object</source>
       <translation type="unfinished">Mission item %1 is not an object</translation>
@@ -16497,6 +16502,21 @@ ROTATION_NONE indicates component points in direction of flight.</translation>
       <location filename="../src/PlanView/SimpleItemEditor.qml" line="243"/>
       <source>Flight Speed</source>
       <translation type="unfinished">Flight Speed</translation>
+    </message>
+    <message>
+      <location filename="../src/QmlControls/SimpleItemEditor.qml" line="199"/>
+      <source>Distance from takeoff to first waypoint or loiter point</source>
+      <translation>起飞点到第一航点或盘旋点的距离</translation>
+    </message>
+    <message>
+      <location filename="../src/QmlControls/SimpleItemEditor.qml" line="209"/>
+      <source>This distance stays fixed. Dragging the first waypoint or loiter point changes only its bearing around takeoff; altitude and loiter radius are preserved.</source>
+      <translation>此距离固定不变。拖动第一航点或盘旋点时，只改变其相对起飞点的方位；高度和盘旋半径保持不变。</translation>
+    </message>
+    <message>
+      <location filename="../src/QmlControls/SimpleItemEditor.qml" line="210"/>
+      <source>Add and place the first waypoint or loiter point away from takeoff to set this distance.</source>
+      <translation>请先添加第一航点或盘旋点，并使其与起飞点保持一定距离。</translation>
     </message>
   </context>
   <context>

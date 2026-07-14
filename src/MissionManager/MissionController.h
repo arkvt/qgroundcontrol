@@ -12,8 +12,9 @@
 #include <QtCore/QHash>
 #include <QtCore/QFile>
 #include <QtCore/QLoggingCategory>
-
+#include <QtCore/QPointer>
 #include "PlanElementController.h"
+#include "Fact.h"
 #include "QmlObjectListModel.h"
 #include "QGCGeoBoundingCube.h"
 #include "QGroundControlQmlGlobal.h"
@@ -92,6 +93,8 @@ public:
     Q_PROPERTY(int                  currentPlanViewVIIndex          READ currentPlanViewVIIndex         NOTIFY currentPlanViewVIIndexChanged)
     Q_PROPERTY(VisualMissionItem*   currentPlanViewItem             READ currentPlanViewItem            NOTIFY currentPlanViewItemChanged)
     Q_PROPERTY(TakeoffMissionItem*  takeoffMissionItem              READ takeoffMissionItem             NOTIFY takeoffMissionItemChanged)
+    Q_PROPERTY(Fact*                takeoffToFirstWaypointDistance  READ takeoffToFirstWaypointDistance CONSTANT)
+    Q_PROPERTY(bool                 takeoffToFirstWaypointDistanceAvailable READ takeoffToFirstWaypointDistanceAvailable NOTIFY takeoffToFirstWaypointDistanceAvailableChanged)
     Q_PROPERTY(double               missionTotalDistance            READ missionTotalDistance           NOTIFY missionTotalDistanceChanged)
     Q_PROPERTY(double               missionPlannedDistance          READ missionPlannedDistance         NOTIFY missionPlannedDistanceChanged)
     Q_PROPERTY(double               missionTime                     READ missionTime                    NOTIFY missionTimeChanged)
@@ -121,6 +124,9 @@ public:
     Q_PROPERTY(QGroundControlQmlGlobal::AltMode globalAltitudeModeDefault  READ globalAltitudeModeDefault  NOTIFY globalAltitudeModeChanged)                               ///< Default to use for newly created items
 
     Q_INVOKABLE void removeVisualItem(int viIndex);
+
+    /// Keeps the first waypoint/loiter point on the configured distance circle while it is dragged.
+    Q_INVOKABLE QGeoCoordinate constrainTakeoffToFirstWaypointCoordinate(VisualMissionItem* visualItem, QGeoCoordinate coordinate) const;
 
     /// Add a new simple mission item to the list
     ///     @param coordinate: Coordinate for item
@@ -234,6 +240,8 @@ public:
     QGeoCoordinate      plannedHomePosition         (void) const;
     VisualMissionItem*  currentPlanViewItem         (void) const { return _currentPlanViewItem; }
     TakeoffMissionItem* takeoffMissionItem          (void) const { return _takeoffMissionItem; }
+    Fact*               takeoffToFirstWaypointDistance(void) { return &_takeoffToFirstWaypointDistanceFact; }
+    bool                takeoffToFirstWaypointDistanceAvailable(void) const { return _takeoffToFirstWaypointDistanceAvailable; }
     double              progressPct                 (void) const { return _progressPct; }
     QString             surveyComplexItemName       (void) const;
     QString             corridorScanComplexItemName (void) const;
@@ -293,6 +301,7 @@ signals:
     void currentPlanViewVIIndexChanged      (void);
     void currentPlanViewItemChanged         (void);
     void takeoffMissionItemChanged          (void);
+    void takeoffToFirstWaypointDistanceAvailableChanged(bool available);
     void missionBoundingCubeChanged         (void);
     void missionItemCountChanged            (int missionItemCount);
     void onlyInsertTakeoffValidChanged      (void);
@@ -328,6 +337,7 @@ private slots:
     void _recalcAll                             (void);
     void _managerVehicleChanged                 (Vehicle* managerVehicle);
     void _forceRecalcOfAllowedBits              (void);
+    void _takeoffToFirstWaypointDistanceRawValueChanged(const QVariant& value);
 
 private:
     void                    _init                               (void);
@@ -366,6 +376,9 @@ private:
     FlightPathSegment*      _createFlightPathSegmentWorker      (VisualItemPair& pair, bool mavlinkTerrainFrame);
     void                    _allItemsRemoved                    (void);
     void                    _firstItemAdded                     (void);
+    SimpleMissionItem*      _findFirstRoutePointAfterTakeoff    (void);
+    QGeoCoordinate          _takeoffDistanceOrigin              (void) const;
+    void                    _updateTakeoffToFirstWaypointDistance(void);
 
     static double           _calcDistanceToHome                 (VisualMissionItem* currentItem, VisualMissionItem* homeItem);
     static double           _normalizeLat                       (double lat);
@@ -394,6 +407,12 @@ private:
     int                         _currentPlanViewVIIndex =       -1;
     VisualMissionItem*          _currentPlanViewItem =          nullptr;
     TakeoffMissionItem*         _takeoffMissionItem =           nullptr;
+    Fact                        _takeoffToFirstWaypointDistanceFact;
+    bool                        _takeoffToFirstWaypointDistanceAvailable = false;
+    QPointer<SimpleMissionItem> _takeoffDistanceTarget;
+    double                      _takeoffDistanceFixed =          0.0;
+    double                      _takeoffDistanceAzimuth =        0.0;
+    bool                        _takeoffDistanceInitialized =    false;
     QTimer                      _updateTimer;
     QGCGeoBoundingCube          _travelBoundingCube;
     QGeoCoordinate              _takeoffCoordinate;
@@ -423,6 +442,10 @@ private:
     static constexpr const char* _jsonHoverSpeedKey =             "hoverSpeed";
     static constexpr const char* _jsonParamsKey =                 "params";
     static constexpr const char* _jsonGlobalPlanAltitudeModeKey = "globalPlanAltitudeMode";
+    static constexpr const char* _takeoffToFirstWaypointDistanceFactName = "TakeoffToFirstWaypointDistance";
+    static constexpr double      _takeoffToFirstWaypointDistanceMinimum = 0.1;
+    static constexpr double      _takeoffToFirstWaypointDistanceMaximum = 40100000.0;
+    static constexpr double      _takeoffToFirstWaypointDistanceTolerance = 0.05;
 
     // Deprecated V1 format keys
     static constexpr const char* _jsonComplexItemsKey =           "complexItems";

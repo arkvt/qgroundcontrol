@@ -27,6 +27,7 @@ Item {
     property bool interactive: true
 
     property var    _missionItem:       object
+    property var    _missionController: _missionItem.masterController.missionController
     property bool   _itemVisualShowing: false
     property bool   _dragAreaShowing:   false
 
@@ -67,6 +68,14 @@ Item {
             showDragArea()
         } else {
             hideDragArea()
+        }
+    }
+
+    function recreateDragArea() {
+        if (_dragAreaShowing) {
+            dragAreaLoader.active = false
+            _dragAreaShowing = false
+            Qt.callLater(updateDragArea)
         }
     }
 
@@ -154,7 +163,12 @@ Item {
             itemIndicator:           itemVisualLoader.item
             itemCoordinate:          _missionItem.coordinate
             visible:                 _root.interactive
-            onItemCoordinateChanged: _missionItem.coordinate = itemCoordinate
+            onItemCoordinateChanged: {
+                _missionItem.coordinate = _missionController.constrainTakeoffToFirstWaypointCoordinate(_missionItem, itemCoordinate)
+            }
+            // MouseArea.drag breaks the handle's coordinate/position bindings. Recreate it so the
+            // next drag starts from the point projected onto the fixed-distance circle.
+            onDragStop: _root.recreateDragArea()
         }
     }
 

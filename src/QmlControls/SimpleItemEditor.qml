@@ -22,6 +22,7 @@ Rectangle {
     property real _margin:                  ScreenTools.defaultFontPixelHeight / 2
     property real _altRectMargin:           ScreenTools.defaultFontPixelWidth / 2
     property var  _controllerVehicle:       missionItem.masterController.controllerVehicle
+    property var  _missionController:       missionItem.masterController.missionController
     property int  _globalAltMode:           missionItem.masterController.missionController.globalAltitudeMode
     property bool _globalAltModeIsMixed:    _globalAltMode == QGroundControl.AltitudeModeMixed
     property real _radius:                  ScreenTools.defaultFontPixelWidth / 2
@@ -183,6 +184,36 @@ Rectangle {
                     font.pointSize:     ScreenTools.smallFontPointSize
                     text:               qsTr("Actual AMSL alt sent: %1 %2").arg(missionItem.amslAltAboveTerrain.valueString).arg(missionItem.amslAltAboveTerrain.units)
                     visible:            missionItem.altitudeMode === QGroundControl.AltitudeModeCalcAboveTerrain
+                }
+            }
+
+            ColumnLayout {
+                anchors.left:   parent.left
+                anchors.right:  parent.right
+                spacing:        _altRectMargin
+                visible:        missionItem.isTakeoffItem
+
+                QGCLabel {
+                    Layout.fillWidth:   true
+                    wrapMode:           Text.WordWrap
+                    font.pointSize:     ScreenTools.smallFontPointSize
+                    text:               qsTr("Distance from takeoff to first waypoint or loiter point")
+                    visible:            _missionController.takeoffToFirstWaypointDistanceAvailable
+                }
+
+                FactTextField {
+                    Layout.fillWidth:   true
+                    fact:               _missionController.takeoffToFirstWaypointDistance
+                    visible:            _missionController.takeoffToFirstWaypointDistanceAvailable
+                }
+
+                QGCLabel {
+                    Layout.fillWidth:   true
+                    wrapMode:           Text.WordWrap
+                    font.pointSize:     ScreenTools.smallFontPointSize
+                    text:               _missionController.takeoffToFirstWaypointDistanceAvailable ?
+                                            qsTr("This distance stays fixed. Dragging the first waypoint or loiter point changes only its bearing around takeoff; altitude and loiter radius are preserved.") :
+                                            qsTr("Add and place the first waypoint or loiter point away from takeoff to set this distance.")
                 }
             }
 

@@ -32,6 +32,7 @@ private slots:
     void _testGlobalAltMode             (void);
     void _testGimbalRecalc              (void);
     void _testVehicleYawRecalc          (void);
+    void _testTakeoffToFirstWaypointDistance(void);
 
 private:
 #if 0

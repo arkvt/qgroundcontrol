@@ -36,6 +36,8 @@
 #include <QtCore/QJsonArray>
 #include <QtCore/QJsonDocument>
 
+#include <cmath>
+
 #define UPDATE_TIMEOUT 5000 ///< How often we check for bounding box changes
 
 QGC_LOGGING_CATEGORY(MissionControllerLog, "MissionControllerLog")
@@ -48,7 +50,15 @@ MissionController::MissionController(PlanMasterController* masterController, QOb
     , _visualItems          (new QmlObjectListModel(this))
     , _planViewSettings     (SettingsManager::instance()->planViewSettings())
     , _appSettings          (SettingsManager::instance()->appSettings())
+    , _takeoffToFirstWaypointDistanceFact(0, QString::fromLatin1(_takeoffToFirstWaypointDistanceFactName), FactMetaData::valueTypeDouble)
 {
+    FactMetaData* takeoffDistanceMetaData = _takeoffToFirstWaypointDistanceFact.metaData();
+    takeoffDistanceMetaData->setShortDescription(tr("Distance from takeoff to first waypoint or loiter point"));
+    takeoffDistanceMetaData->setRawUnits(QStringLiteral("m"));
+    takeoffDistanceMetaData->setRawMin(_takeoffToFirstWaypointDistanceMinimum);
+    takeoffDistanceMetaData->setRawMax(_takeoffToFirstWaypointDistanceMaximum);
+    takeoffDistanceMetaData->setDecimalPlaces(1);
+
     _resetMissionFlightStatus();
 
     _updateTimer.setSingleShot(true);
@@ -59,6 +69,7 @@ MissionController::MissionController(PlanMasterController* masterController, QOb
     connect(_masterController,                                  &PlanMasterController::managerVehicleChanged,           this, &MissionController::multipleLandPatternsAllowedChanged);
     connect(this,                                               &MissionController::multipleLandPatternsAllowedChanged, this, &MissionController::_forceRecalcOfAllowedBits);
     connect(this,                                               &MissionController::missionPlannedDistanceChanged,      this, &MissionController::recalcTerrainProfile);
+    connect(&_takeoffToFirstWaypointDistanceFact,               &Fact::containerRawValueChanged,                        this, &MissionController::_takeoffToFirstWaypointDistanceRawValueChanged);
 
     // The follow is used to compress multiple recalc calls in a row to into a single call.
     connect(this, &MissionController::_recalcMissionFlightStatusSignal, this, &MissionController::_recalcMissionFlightStatus,   Qt::QueuedConnection);
@@ -71,6 +82,186 @@ MissionController::MissionController(PlanMasterController* masterController, QOb
 MissionController::~MissionController()
 {
 
+}
+
+SimpleMissionItem* MissionController::_findFirstRoutePointAfterTakeoff(void)
+{
+    if (!_visualItems || !_takeoffMissionItem || !TakeoffMissionItem::isTakeoffCommand(_takeoffMissionItem->mavCommand())) {
+        return nullptr;
+    }
+
+    bool pastTakeoff = false;
+    for (int i = 0; i < _visualItems->count(); i++) {
+        VisualMissionItem* visualItem = qobject_cast<VisualMissionItem*>(_visualItems->get(i));
+        if (!visualItem) {
+            continue;
+        }
+
+        if (!pastTakeoff) {
+            pastTakeoff = visualItem == _takeoffMissionItem;
+            continue;
+        }
+
+        if (visualItem->isLandCommand()) {
+            return nullptr;
+        }
+
+        SimpleMissionItem* simpleItem = qobject_cast<SimpleMissionItem*>(visualItem);
+        if (!simpleItem) {
+            if (visualItem->specifiesCoordinate() && !visualItem->isStandaloneCoordinate()) {
+                return nullptr;
+            }
+            continue;
+        }
+
+        const MAV_CMD command = simpleItem->mavCommand();
+        if (command == MAV_CMD_NAV_RETURN_TO_LAUNCH || command == MAV_CMD_DO_LAND_START || TakeoffMissionItem::isTakeoffCommand(command)) {
+            return nullptr;
+        }
+        if (command == MAV_CMD_NAV_WAYPOINT || simpleItem->isLoiterItem()) {
+            return simpleItem;
+        }
+
+        // Only commands which do not participate in the flight path may be skipped. If a spline
+        // waypoint, survey, or another unsupported fly-through coordinate comes first, the value
+        // does not describe the next flight segment and must remain unavailable.
+        if (visualItem->specifiesCoordinate() && !visualItem->isStandaloneCoordinate()) {
+            return nullptr;
+        }
+    }
+
+    return nullptr;
+}
+
+QGeoCoordinate MissionController::constrainTakeoffToFirstWaypointCoordinate(VisualMissionItem* visualItem, QGeoCoordinate coordinate) const
+{
+    if (!_takeoffDistanceInitialized || visualItem != _takeoffDistanceTarget.data() || !coordinate.isValid()) {
+        return coordinate;
+    }
+
+    const QGeoCoordinate origin = _takeoffDistanceOrigin();
+    if (!origin.isValid()) {
+        return coordinate;
+    }
+
+    const double requestedDistance = origin.distanceTo(coordinate);
+    double azimuth = _takeoffDistanceAzimuth;
+    if (std::isfinite(requestedDistance) && requestedDistance >= _takeoffToFirstWaypointDistanceMinimum) {
+        const double requestedAzimuth = origin.azimuthTo(coordinate);
+        if (std::isfinite(requestedAzimuth)) {
+            azimuth = requestedAzimuth;
+        }
+    }
+    if (!std::isfinite(azimuth)) {
+        return coordinate;
+    }
+
+    QGeoCoordinate constrainedCoordinate = origin.atDistanceAndAzimuth(_takeoffDistanceFixed, azimuth);
+    constrainedCoordinate.setAltitude(coordinate.altitude());
+    return constrainedCoordinate;
+}
+
+QGeoCoordinate MissionController::_takeoffDistanceOrigin(void) const
+{
+    if (!_takeoffMissionItem || !TakeoffMissionItem::isTakeoffCommand(_takeoffMissionItem->mavCommand())) {
+        return QGeoCoordinate();
+    }
+
+    return _takeoffMissionItem->specifiesCoordinate()
+        ? _takeoffMissionItem->coordinate()
+        : _takeoffMissionItem->launchCoordinate();
+}
+
+void MissionController::_updateTakeoffToFirstWaypointDistance(void)
+{
+    SimpleMissionItem* firstRoutePoint = _findFirstRoutePointAfterTakeoff();
+
+    if (!firstRoutePoint || _takeoffDistanceTarget.data() != firstRoutePoint) {
+        _takeoffDistanceTarget = firstRoutePoint;
+        _takeoffDistanceFixed = 0.0;
+        _takeoffDistanceAzimuth = 0.0;
+        _takeoffDistanceInitialized = false;
+    }
+
+    bool available = false;
+    if (firstRoutePoint) {
+        const QGeoCoordinate origin = _takeoffDistanceOrigin();
+        QGeoCoordinate routePointCoordinate = firstRoutePoint->coordinate();
+        if (origin.isValid() && routePointCoordinate.isValid()) {
+            double distance = origin.distanceTo(routePointCoordinate);
+            if (std::isfinite(distance)) {
+                const double azimuth = origin.azimuthTo(routePointCoordinate);
+
+                if (!_takeoffDistanceInitialized && distance >= _takeoffToFirstWaypointDistanceMinimum &&
+                    distance <= _takeoffToFirstWaypointDistanceMaximum && std::isfinite(azimuth)) {
+                    _takeoffDistanceFixed = distance;
+                    _takeoffDistanceAzimuth = azimuth;
+                    _takeoffDistanceInitialized = true;
+                } else if (_takeoffDistanceInitialized) {
+                    if (distance >= _takeoffToFirstWaypointDistanceMinimum && std::isfinite(azimuth)) {
+                        _takeoffDistanceAzimuth = azimuth;
+                    }
+
+                    if (qAbs(distance - _takeoffDistanceFixed) > _takeoffToFirstWaypointDistanceTolerance) {
+                        const QGeoCoordinate constrainedCoordinate =
+                            constrainTakeoffToFirstWaypointCoordinate(firstRoutePoint, routePointCoordinate);
+                        if (constrainedCoordinate.isValid()) {
+                            firstRoutePoint->setCoordinate(constrainedCoordinate);
+                            routePointCoordinate = firstRoutePoint->coordinate();
+                            distance = origin.distanceTo(routePointCoordinate);
+                        }
+                    }
+                }
+
+                if (_takeoffDistanceInitialized) {
+                    _takeoffToFirstWaypointDistanceFact.containerSetRawValue(_takeoffDistanceFixed);
+                    available = std::isfinite(distance) &&
+                                _takeoffDistanceFixed >= _takeoffToFirstWaypointDistanceMinimum &&
+                                _takeoffDistanceFixed <= _takeoffToFirstWaypointDistanceMaximum;
+                }
+            }
+        }
+    }
+
+    if (_takeoffToFirstWaypointDistanceAvailable != available) {
+        _takeoffToFirstWaypointDistanceAvailable = available;
+        emit takeoffToFirstWaypointDistanceAvailableChanged(available);
+    }
+}
+
+void MissionController::_takeoffToFirstWaypointDistanceRawValueChanged(const QVariant& value)
+{
+    SimpleMissionItem* firstRoutePoint = _findFirstRoutePointAfterTakeoff();
+    const QGeoCoordinate origin = _takeoffDistanceOrigin();
+    if (!firstRoutePoint || !origin.isValid()) {
+        _updateTakeoffToFirstWaypointDistance();
+        return;
+    }
+
+    const QGeoCoordinate oldCoordinate = firstRoutePoint->coordinate();
+    const double oldDistance = origin.distanceTo(oldCoordinate);
+    const double newDistance = value.toDouble();
+    if (!oldCoordinate.isValid() || !std::isfinite(oldDistance) || oldDistance < _takeoffToFirstWaypointDistanceMinimum ||
+        !std::isfinite(newDistance) || newDistance < _takeoffToFirstWaypointDistanceMinimum || newDistance > _takeoffToFirstWaypointDistanceMaximum) {
+        _updateTakeoffToFirstWaypointDistance();
+        return;
+    }
+
+    const double azimuth = origin.azimuthTo(oldCoordinate);
+    if (!std::isfinite(azimuth)) {
+        _updateTakeoffToFirstWaypointDistance();
+        return;
+    }
+
+    _takeoffDistanceTarget = firstRoutePoint;
+    _takeoffDistanceFixed = newDistance;
+    _takeoffDistanceAzimuth = azimuth;
+    _takeoffDistanceInitialized = true;
+
+    QGeoCoordinate newCoordinate = origin.atDistanceAndAzimuth(newDistance, azimuth);
+    newCoordinate.setAltitude(oldCoordinate.altitude());
+    firstRoutePoint->setCoordinate(newCoordinate);
+    _updateTakeoffToFirstWaypointDistance();
 }
 
 void MissionController::_resetMissionFlightStatus(void)
@@ -1891,6 +2082,7 @@ void MissionController::_recalcAllWithCoordinate(const QGeoCoordinate& coordinat
     }
     _recalcSequence();
     _recalcChildItems();
+    _updateTakeoffToFirstWaypointDistance();
     emit _recalcFlightPathSegmentsSignal();
     _updateTimer.start(UPDATE_TIMEOUT);
 }
@@ -1961,6 +2153,7 @@ void MissionController::_initVisualItem(VisualMissionItem* visualItem)
     setDirty(false);
 
     connect(visualItem, &VisualMissionItem::specifiesCoordinateChanged,                 this, &MissionController::_recalcFlightPathSegmentsSignal,  Qt::QueuedConnection);
+    connect(visualItem, &VisualMissionItem::coordinateChanged,                          this, &MissionController::_updateTakeoffToFirstWaypointDistance, Qt::QueuedConnection);
     connect(visualItem, &VisualMissionItem::specifiedFlightSpeedChanged,                this, &MissionController::_recalcMissionFlightStatusSignal, Qt::QueuedConnection);
     connect(visualItem, &VisualMissionItem::specifiedGimbalYawChanged,                  this, &MissionController::_recalcMissionFlightStatusSignal, Qt::QueuedConnection);
     connect(visualItem, &VisualMissionItem::specifiedGimbalPitchChanged,                this, &MissionController::_recalcMissionFlightStatusSignal, Qt::QueuedConnection);
@@ -2001,6 +2194,7 @@ void MissionController::_deinitVisualItem(VisualMissionItem* visualItem)
 void MissionController::_itemCommandChanged(void)
 {
     _recalcChildItems();
+    _updateTakeoffToFirstWaypointDistance();
     emit _recalcFlightPathSegmentsSignal();
 }
 

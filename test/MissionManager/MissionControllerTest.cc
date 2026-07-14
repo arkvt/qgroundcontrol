@@ -12,6 +12,7 @@
 #include "MissionController.h"
 #include "PlanMasterController.h"
 #include "SimpleMissionItem.h"
+#include "TakeoffMissionItem.h"
 #include "MissionSettingsItem.h"
 #include "SettingsManager.h"
 #include "AppSettings.h"
@@ -230,6 +231,95 @@ void MissionControllerTest::_testVehicleYawRecalc(void)
             expectedVehicleYaw += wpAngleInc;
         }
     }
+}
+
+void MissionControllerTest::_testTakeoffToFirstWaypointDistance(void)
+{
+    _initForFirmwareType(MAV_AUTOPILOT_ARDUPILOTMEGA);
+
+    const QGeoCoordinate takeoffCoordinate(47.397742, 8.545594, 0.0);
+    TakeoffMissionItem* takeoffItem = qobject_cast<TakeoffMissionItem*>(_missionController->insertTakeoffItem(takeoffCoordinate, 1));
+    QVERIFY(takeoffItem);
+    takeoffItem->setLaunchCoordinate(takeoffCoordinate);
+    QVERIFY(!_missionController->takeoffToFirstWaypointDistanceAvailable());
+
+    QGeoCoordinate waypointCoordinate = takeoffCoordinate.atDistanceAndAzimuth(500.0, 73.0);
+    SimpleMissionItem* waypoint = qobject_cast<SimpleMissionItem*>(_missionController->insertSimpleMissionItem(waypointCoordinate, 2));
+    QVERIFY(waypoint);
+    waypoint->altitude()->setRawValue(123.0);
+
+    QTRY_VERIFY(_missionController->takeoffToFirstWaypointDistanceAvailable());
+    QVERIFY(qAbs(_missionController->takeoffToFirstWaypointDistance()->rawValue().toDouble() - 500.0) < 0.2);
+
+    const double originalAzimuth = takeoffCoordinate.azimuthTo(waypoint->coordinate());
+    const double originalAltitude = waypoint->altitude()->rawValue().toDouble();
+    _missionController->setDirty(false);
+    _missionController->takeoffToFirstWaypointDistance()->setRawValue(800.0);
+
+    QTRY_VERIFY(qAbs(takeoffCoordinate.distanceTo(waypoint->coordinate()) - 800.0) < 0.2);
+    QVERIFY(qAbs(takeoffCoordinate.azimuthTo(waypoint->coordinate()) - originalAzimuth) < 0.01);
+    QCOMPARE(waypoint->altitude()->rawValue().toDouble(), originalAltitude);
+    QVERIFY(_missionController->dirty());
+
+    // Moving the waypoint changes only its bearing. The configured distance remains fixed.
+    QGeoCoordinate draggedCoordinate = takeoffCoordinate.atDistanceAndAzimuth(650.0, 120.0);
+    waypoint->setCoordinate(draggedCoordinate);
+    QTRY_VERIFY(qAbs(takeoffCoordinate.distanceTo(waypoint->coordinate()) - 800.0) < 0.2);
+    QVERIFY(qAbs(_missionController->takeoffToFirstWaypointDistance()->rawValue().toDouble() - 800.0) < 0.2);
+    QVERIFY(qAbs(takeoffCoordinate.azimuthTo(waypoint->coordinate()) - 120.0) < 0.01);
+    QCOMPARE(waypoint->altitude()->rawValue().toDouble(), originalAltitude);
+
+    // Non-coordinate commands between takeoff and the first waypoint are skipped.
+    SimpleMissionItem* changeSpeed = qobject_cast<SimpleMissionItem*>(
+        _missionController->insertSimpleMissionItem(takeoffCoordinate.atDistanceAndAzimuth(100.0, 10.0), 2));
+    QVERIFY(changeSpeed);
+    changeSpeed->setCommand(MAV_CMD_DO_CHANGE_SPEED);
+    QTRY_VERIFY(_missionController->takeoffToFirstWaypointDistanceAvailable());
+
+    // A loiter command is a supported first route point. Changing its distance or dragging its
+    // center must preserve loiter-specific parameters and altitude.
+    SimpleMissionItem* loiter = qobject_cast<SimpleMissionItem*>(
+        _missionController->insertSimpleMissionItem(takeoffCoordinate.atDistanceAndAzimuth(200.0, 20.0), 2));
+    QVERIFY(loiter);
+    loiter->setCommand(MAV_CMD_NAV_LOITER_TIME);
+    loiter->missionItem().setParam1(45.0);
+    loiter->setRadius(-90.0);
+    loiter->altitude()->setRawValue(88.0);
+
+    QTRY_VERIFY(_missionController->takeoffToFirstWaypointDistanceAvailable());
+    QTRY_VERIFY(qAbs(_missionController->takeoffToFirstWaypointDistance()->rawValue().toDouble() - 200.0) < 0.2);
+
+    _missionController->takeoffToFirstWaypointDistance()->setRawValue(300.0);
+    QTRY_VERIFY(qAbs(takeoffCoordinate.distanceTo(loiter->coordinate()) - 300.0) < 0.2);
+    QVERIFY(qAbs(takeoffCoordinate.azimuthTo(loiter->coordinate()) - 20.0) < 0.01);
+    QCOMPARE(loiter->missionItem().param1(), 45.0);
+    QCOMPARE(loiter->loiterRadius(), -90.0);
+    QCOMPARE(loiter->altitude()->rawValue().toDouble(), 88.0);
+
+    loiter->setCoordinate(takeoffCoordinate.atDistanceAndAzimuth(450.0, 140.0));
+    QTRY_VERIFY(qAbs(takeoffCoordinate.distanceTo(loiter->coordinate()) - 300.0) < 0.2);
+    QVERIFY(qAbs(takeoffCoordinate.azimuthTo(loiter->coordinate()) - 140.0) < 0.01);
+    QVERIFY(qAbs(_missionController->takeoffToFirstWaypointDistance()->rawValue().toDouble() - 300.0) < 0.2);
+    QCOMPARE(loiter->missionItem().param1(), 45.0);
+    QCOMPARE(loiter->loiterRadius(), -90.0);
+    QCOMPARE(loiter->altitude()->rawValue().toDouble(), 88.0);
+
+    // An unsupported flight-path coordinate before the loiter point blocks this setting.
+    SimpleMissionItem* spline = qobject_cast<SimpleMissionItem*>(
+        _missionController->insertSimpleMissionItem(takeoffCoordinate.atDistanceAndAzimuth(150.0, 30.0), 2));
+    QVERIFY(spline);
+    spline->setCommand(MAV_CMD_NAV_SPLINE_WAYPOINT);
+    QTRY_VERIFY(!_missionController->takeoffToFirstWaypointDistanceAvailable());
+
+    _missionController->removeVisualItem(_missionController->visualItems()->indexOf(spline));
+    QTRY_VERIFY(_missionController->takeoffToFirstWaypointDistanceAvailable());
+    QTRY_VERIFY(qAbs(_missionController->takeoffToFirstWaypointDistance()->rawValue().toDouble() - 300.0) < 0.2);
+
+    _missionController->removeVisualItem(_missionController->visualItems()->indexOf(loiter));
+    QTRY_VERIFY(_missionController->takeoffToFirstWaypointDistanceAvailable());
+    QTRY_VERIFY(qAbs(_missionController->takeoffToFirstWaypointDistance()->rawValue().toDouble() - 800.0) < 0.2);
+    _missionController->removeVisualItem(_missionController->visualItems()->indexOf(waypoint));
+    QTRY_VERIFY(!_missionController->takeoffToFirstWaypointDistanceAvailable());
 }
 
 void MissionControllerTest::_testLoadJsonSectionAvailable(void)
