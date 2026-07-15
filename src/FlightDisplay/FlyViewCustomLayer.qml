@@ -38,6 +38,8 @@ Item {
 
     property var _activeVehicle: QGroundControl.multiVehicleManager.activeVehicle
     readonly property bool _customLandingVisible: customLandingController.modeActive
+    readonly property bool _followReturnVisible: customLandingController.followReturnModeActive
+                                                 && customLandingController.followReturnPlanValid
     property real _panelMargin: Math.max(8, ScreenTools.defaultFontPixelWidth * 0.75)
 
     function _queryCustomLandingCapability() {
@@ -65,6 +67,41 @@ Item {
         map: _root.mapControl
         controller: customLandingController
         active: _root._customLandingVisible
+    }
+
+    // FOLLOW_RETURN reuses the same constrained loiter/tangent geometry as
+    // CUSTOM_LAND, but its plan is generated inside the flight controller and
+    // must remain read-only in QGC.
+    QtObject {
+        id: followReturnVisualController
+
+        readonly property var loiterCoordinate: customLandingController.followReturnLoiterCoordinate
+        readonly property var landingCoordinate: customLandingController.followReturnLandingCoordinate
+        readonly property real loiterAltitude: customLandingController.followReturnLoiterAltitude
+        readonly property real landingAltitude: 0
+        readonly property real loiterRadius: customLandingController.followReturnRadius
+        readonly property real tangentDistance: customLandingController.followReturnTangentDistance
+        readonly property real approachAirspeed: 0
+        readonly property bool clockwise: customLandingController.followReturnClockwise
+        readonly property bool safeClimbRequired: customLandingController.followReturnSafeClimbRequired
+        readonly property bool modeActive: false
+        readonly property bool capabilitySupported: false
+        readonly property bool busy: false
+        readonly property bool planCommitted: true
+    }
+
+    CustomLandingMapVisual {
+        id: followReturnMapVisual
+        map: _root.mapControl
+        controller: followReturnVisualController
+        active: _root._followReturnVisible
+        entryCoordinate: customLandingController.followReturnEntryCoordinate
+        readOnly: true
+        showConstraintCircle: false
+        showEntryLoiterCircle: followReturnVisualController.safeClimbRequired
+        routePathColor: "#ffd400"
+        routePathWidth: 12
+        routePathOpacity: 0.65
     }
 
     CustomLandingPanel {

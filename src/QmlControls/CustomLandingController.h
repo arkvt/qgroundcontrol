@@ -52,6 +52,19 @@ class CustomLandingController : public QObject
     Q_PROPERTY(quint32 planId READ planId NOTIFY planIdChanged)
     Q_PROPERTY(quint16 planCrc READ planCrc NOTIFY planCrcChanged)
 
+    // Read-only geometry generated when ArduPlane enters FOLLOW_RETURN (mode
+    // 92). It is kept separate from the editable CUSTOM_LAND draft above.
+    Q_PROPERTY(bool followReturnModeActive READ followReturnModeActive NOTIFY followReturnModeActiveChanged)
+    Q_PROPERTY(bool followReturnPlanValid READ followReturnPlanValid NOTIFY followReturnPlanChanged)
+    Q_PROPERTY(QGeoCoordinate followReturnEntryCoordinate READ followReturnEntryCoordinate NOTIFY followReturnPlanChanged)
+    Q_PROPERTY(QGeoCoordinate followReturnLoiterCoordinate READ followReturnLoiterCoordinate NOTIFY followReturnPlanChanged)
+    Q_PROPERTY(QGeoCoordinate followReturnLandingCoordinate READ followReturnLandingCoordinate NOTIFY followReturnPlanChanged)
+    Q_PROPERTY(double followReturnLoiterAltitude READ followReturnLoiterAltitude NOTIFY followReturnPlanChanged)
+    Q_PROPERTY(double followReturnRadius READ followReturnRadius NOTIFY followReturnPlanChanged)
+    Q_PROPERTY(double followReturnTangentDistance READ followReturnTangentDistance NOTIFY followReturnPlanChanged)
+    Q_PROPERTY(bool followReturnClockwise READ followReturnClockwise NOTIFY followReturnPlanChanged)
+    Q_PROPERTY(bool followReturnSafeClimbRequired READ followReturnSafeClimbRequired NOTIFY followReturnPlanChanged)
+
 public:
     explicit CustomLandingController(QObject* parent = nullptr);
     ~CustomLandingController() override;
@@ -85,6 +98,17 @@ public:
     quint32 planId() const { return _planId; }
     quint16 planCrc() const { return _planCrc; }
 
+    bool followReturnModeActive() const { return _followReturnModeActive; }
+    bool followReturnPlanValid() const { return _followReturnPlanValid; }
+    QGeoCoordinate followReturnEntryCoordinate() const { return _followReturnEntryCoordinate; }
+    QGeoCoordinate followReturnLoiterCoordinate() const { return _followReturnLoiterCoordinate; }
+    QGeoCoordinate followReturnLandingCoordinate() const { return _followReturnLandingCoordinate; }
+    double followReturnLoiterAltitude() const { return _followReturnLoiterAltitude; }
+    double followReturnRadius() const { return _followReturnRadius; }
+    double followReturnTangentDistance() const { return _followReturnTangentDistance; }
+    bool followReturnClockwise() const { return _followReturnClockwise; }
+    bool followReturnSafeClimbRequired() const { return _followReturnSafeClimbRequired; }
+
     Q_INVOKABLE void queryCapability();
     Q_INVOKABLE void execute();
     Q_INVOKABLE void cancel();
@@ -109,6 +133,8 @@ signals:
     void errorTextChanged();
     void planIdChanged();
     void planCrcChanged();
+    void followReturnModeActiveChanged();
+    void followReturnPlanChanged();
 
 private:
     friend struct CustomLandingCommandContext;
@@ -155,8 +181,12 @@ private:
     };
 
     void _activeVehicleChanged(Vehicle* activeVehicle);
+    void _armedChanged(bool armed);
     void _flightModeChanged();
     void _updateModeActive();
+    void _rebuildFollowReturnPlan();
+    void _clearFollowReturnPlan();
+    double _parameterValue(const QString& name, double fallback) const;
     void _abortOperation(const QString& reason);
     void _setBusy(bool busy);
     void _setCapabilitySupported(bool supported);
@@ -207,6 +237,18 @@ private:
     QString _errorText;
     quint32 _planId = 0;
     quint16 _planCrc = 0;
+
+    QGeoCoordinate _followReturnLaunchCoordinate;
+    QGeoCoordinate _followReturnEntryCoordinate;
+    QGeoCoordinate _followReturnLoiterCoordinate;
+    QGeoCoordinate _followReturnLandingCoordinate;
+    double _followReturnLoiterAltitude = 50.0;
+    double _followReturnRadius = 250.0;
+    double _followReturnTangentDistance = 300.0;
+    bool _followReturnClockwise = true;
+    bool _followReturnSafeClimbRequired = false;
+    bool _followReturnModeActive = false;
+    bool _followReturnPlanValid = false;
     QPointer<Fact> _tangentDistanceFact;
     QPointer<ParameterManager> _parameterManager;
 
@@ -217,6 +259,7 @@ private:
     quint64 _operationGeneration = 0;
 
     static constexpr quint32 kCustomLandingMode = 91;
+    static constexpr quint32 kFollowReturnMode = 92;
     static constexpr quint8 kProtocolVersion = 2;
     static constexpr int kMaxAttempts = 3;
     static constexpr int kRetryDelayMs = 250;

@@ -42,6 +42,7 @@ struct APMPlaneMode
         LOITER2QLAND  = 25,
         FOLLOW_TARGET = 90,
         CUSTOM_LAND   = 91,
+        FOLLOW_RETURN = 92,
     };
 };
 
@@ -92,6 +93,7 @@ protected:
     const QString _loiter2qlandFlightMode = tr("Loiter to QLand");
     const QString _followTargetFlightMode = tr("Follow Target");
     const QString _customLandFlightMode = tr("Custom Landing");
+    const QString _followReturnFlightMode = tr("Loss Return");
 
 private:
     static bool _remapParamNameIntialized;

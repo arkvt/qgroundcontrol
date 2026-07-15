@@ -93,6 +93,12 @@ void CustomLandingController::setVehicle(Vehicle* vehicle)
     }
 
     _abortOperation(QString());
+    if (_followReturnModeActive) {
+        _followReturnModeActive = false;
+        emit followReturnModeActiveChanged();
+    }
+    _clearFollowReturnPlan();
+    _followReturnLaunchCoordinate = QGeoCoordinate();
     if (_tangentDistanceFact) {
         disconnect(_tangentDistanceFact, nullptr, this, nullptr);
         _tangentDistanceFact.clear();
@@ -118,19 +124,59 @@ void CustomLandingController::setVehicle(Vehicle* vehicle)
 
     if (_vehicle) {
         connect(_vehicle, &Vehicle::flightModeChanged, this, [this](const QString&) { _flightModeChanged(); });
+        connect(_vehicle, &Vehicle::armedChanged, this, &CustomLandingController::_armedChanged);
+        connect(_vehicle, &Vehicle::coordinateChanged, this,
+                [this](const QGeoCoordinate& coordinate) {
+                    // A mode heartbeat can arrive before the first valid
+                    // global-position sample. Freeze only that first valid
+                    // fallback; an established route must never drift with
+                    // later aircraft position updates.
+                    if (_followReturnModeActive &&
+                        !_followReturnEntryCoordinate.isValid() && coordinate.isValid()) {
+                        _followReturnEntryCoordinate = coordinate;
+                        _rebuildFollowReturnPlan();
+                    }
+                });
+        connect(_vehicle, &Vehicle::homePositionChanged, this,
+                [this](const QGeoCoordinate& homePosition) {
+                    if (_vehicle && _vehicle->armed() &&
+                        !_followReturnLaunchCoordinate.isValid() && homePosition.isValid()) {
+                        _followReturnLaunchCoordinate = homePosition;
+                        if (_followReturnModeActive) {
+                            _rebuildFollowReturnPlan();
+                        }
+                    }
+                });
         connect(_vehicle, &QObject::destroyed, this, [this]() { setVehicle(nullptr); });
+
+        // When QGC connects after arming, the physical arming coordinate is
+        // retained by Vehicle::armedPosition. Home is only a fallback for a
+        // connection established after QGC missed the arming transition.
+        if (_vehicle->armed()) {
+            _followReturnLaunchCoordinate = _vehicle->armedPosition().isValid()
+                                                    ? _vehicle->armedPosition()
+                                                    : _vehicle->homePosition();
+        }
 
         _parameterManager = _vehicle->parameterManager();
         connect(_parameterManager, &ParameterManager::parametersReadyChanged, this,
                 [this](bool parametersReady) {
                     if (parametersReady) {
                         _refreshTangentDistanceParameter();
+                        if (_followReturnModeActive) {
+                            _rebuildFollowReturnPlan();
+                        }
                     }
                 });
         connect(_parameterManager, &ParameterManager::factAdded, this,
                 [this](int, Fact* fact) {
                     if (fact && fact->name() == QStringLiteral("CLND_TAN_DIST")) {
                         _refreshTangentDistanceParameter();
+                    }
+                    if (_followReturnModeActive && fact &&
+                        (fact->name().startsWith(QStringLiteral("FT_LOSS_")) ||
+                         fact->name() == QStringLiteral("FT_DIR"))) {
+                        _rebuildFollowReturnPlan();
                     }
                 });
         _refreshTangentDistanceParameter();
@@ -526,6 +572,129 @@ void CustomLandingController::_activeVehicleChanged(Vehicle* activeVehicle)
     setVehicle(activeVehicle);
 }
 
+void CustomLandingController::_armedChanged(bool armed)
+{
+    if (!armed) {
+        _followReturnLaunchCoordinate = QGeoCoordinate();
+        return;
+    }
+
+    // FOLLOW_RETURN freezes current_loc on this same arming transition.
+    // Prefer the live coordinate here; Home remains the late-connect fallback
+    // installed by setVehicle().
+    if (_vehicle && _vehicle->armedPosition().isValid()) {
+        _followReturnLaunchCoordinate = _vehicle->armedPosition();
+    } else if (_vehicle && _vehicle->coordinate().isValid()) {
+        _followReturnLaunchCoordinate = _vehicle->coordinate();
+    } else if (_vehicle && _vehicle->homePosition().isValid()) {
+        _followReturnLaunchCoordinate = _vehicle->homePosition();
+    }
+}
+
+double CustomLandingController::_parameterValue(const QString& name, double fallback) const
+{
+    if (!_parameterManager ||
+        !_parameterManager->parameterExists(ParameterManager::defaultComponentId, name)) {
+        return fallback;
+    }
+
+    Fact* const fact = _parameterManager->getParameter(ParameterManager::defaultComponentId, name);
+    bool ok = false;
+    const double value = fact ? fact->rawValue().toDouble(&ok) : fallback;
+    return ok && std::isfinite(value) ? value : fallback;
+}
+
+void CustomLandingController::_clearFollowReturnPlan()
+{
+    const bool changed = _followReturnPlanValid ||
+                         _followReturnEntryCoordinate.isValid() ||
+                         _followReturnLoiterCoordinate.isValid() ||
+                         _followReturnLandingCoordinate.isValid();
+
+    _followReturnPlanValid = false;
+    _followReturnEntryCoordinate = QGeoCoordinate();
+    _followReturnLoiterCoordinate = QGeoCoordinate();
+    _followReturnLandingCoordinate = QGeoCoordinate();
+    _followReturnLoiterAltitude = 50.0;
+    _followReturnRadius = 250.0;
+    _followReturnTangentDistance = 300.0;
+    _followReturnClockwise = true;
+    _followReturnSafeClimbRequired = false;
+
+    if (changed) {
+        emit followReturnPlanChanged();
+    }
+}
+
+void CustomLandingController::_rebuildFollowReturnPlan()
+{
+    _followReturnPlanValid = false;
+    _followReturnLoiterCoordinate = QGeoCoordinate();
+    _followReturnLandingCoordinate = QGeoCoordinate();
+    _followReturnSafeClimbRequired = false;
+
+    if (!_followReturnModeActive || !_vehicle ||
+        !_followReturnEntryCoordinate.isValid()) {
+        emit followReturnPlanChanged();
+        return;
+    }
+
+    QGeoCoordinate landing = _followReturnLaunchCoordinate;
+    if (!landing.isValid()) {
+        landing = _vehicle->homePosition();
+    }
+
+    double radius = _parameterValue(QStringLiteral("FT_LOSS_RAD"), 250.0);
+    // Match the flight controller's compatibility handling for a persisted
+    // zero from the development version of mode 92.
+    if (qFuzzyIsNull(radius)) {
+        radius = 250.0;
+    }
+    const double tangentDistance = _parameterValue(QStringLiteral("FT_LOSS_TAN_DST"), 300.0);
+    const double descentAltitude = _parameterValue(QStringLiteral("FT_LOSS_DSC_ALT"), 50.0);
+    const double returnAltitude = _parameterValue(QStringLiteral("FT_LOSS_RET_ALT"), 80.0);
+    const double direction = _parameterValue(QStringLiteral("FT_DIR"), 0.0);
+
+    if (!landing.isValid() ||
+        !std::isfinite(radius) || radius < 10.0 || radius > 1000.0 ||
+        !std::isfinite(tangentDistance) || tangentDistance < 30.0 || tangentDistance > 5000.0 ||
+        !std::isfinite(descentAltitude) || descentAltitude < 20.0 || descentAltitude > 500.0 ||
+        !std::isfinite(returnAltitude) || returnAltitude < 20.0 || returnAltitude > 1000.0 ||
+        returnAltitude < descentAltitude + 20.0) {
+        emit followReturnPlanChanged();
+        return;
+    }
+
+    const double launchToEntryBearing = landing.azimuthTo(_followReturnEntryCoordinate);
+    const double centerDistance = std::hypot(radius, tangentDistance);
+    if (!std::isfinite(launchToEntryBearing) || !std::isfinite(centerDistance)) {
+        emit followReturnPlanChanged();
+        return;
+    }
+
+    QGeoCoordinate loiter = landing.atDistanceAndAzimuth(centerDistance, launchToEntryBearing);
+    if (!loiter.isValid()) {
+        emit followReturnPlanChanged();
+        return;
+    }
+    if (std::isfinite(landing.altitude())) {
+        loiter.setAltitude(landing.altitude() + descentAltitude);
+    }
+
+    _followReturnLandingCoordinate = landing;
+    _followReturnLoiterCoordinate = loiter;
+    _followReturnLoiterAltitude = descentAltitude;
+    _followReturnRadius = radius;
+    _followReturnTangentDistance = tangentDistance;
+    _followReturnClockwise = std::lround(direction) == 0;
+    _followReturnSafeClimbRequired =
+            std::isfinite(_followReturnEntryCoordinate.altitude()) &&
+            std::isfinite(landing.altitude()) &&
+            _followReturnEntryCoordinate.altitude() < landing.altitude() + returnAltitude - 5.0;
+    _followReturnPlanValid = true;
+    emit followReturnPlanChanged();
+}
+
 void CustomLandingController::_flightModeChanged()
 {
     _updateModeActive();
@@ -533,28 +702,42 @@ void CustomLandingController::_flightModeChanged()
 
 void CustomLandingController::_updateModeActive()
 {
-    const bool active = _vehicle && (_vehicle->customMode() == kCustomLandingMode);
-    if (active == _modeActive) {
+    const bool customLandingActive = _vehicle && (_vehicle->customMode() == kCustomLandingMode);
+    if (customLandingActive != _modeActive) {
+        _modeActive = customLandingActive;
+        if (!_modeActive) {
+            if (_busy && (_operation != Operation::QueryCapability)) {
+                _abortOperation(tr("Vehicle left Custom Landing mode"));
+            }
+            _setPlanCommitted(false);
+            _commitUncertain = false;
+            _applyPendingTangentDistance();
+            _setStateText(tr("Custom Landing mode is not active"));
+        } else {
+            _setPlanCommitted(false);
+            _commitUncertain = false;
+            _setStateText(tr("Select loiter and landing points"));
+        }
+
+        emit modeActiveChanged();
+        emit canExecuteChanged();
+    }
+
+    const bool followReturnActive = _vehicle && (_vehicle->customMode() == kFollowReturnMode);
+    if (followReturnActive == _followReturnModeActive) {
         return;
     }
 
-    _modeActive = active;
-    if (!_modeActive) {
-        if (_busy && (_operation != Operation::QueryCapability)) {
-            _abortOperation(tr("Vehicle left Custom Landing mode"));
-        }
-        _setPlanCommitted(false);
-        _commitUncertain = false;
-        _applyPendingTangentDistance();
-        _setStateText(tr("Custom Landing mode is not active"));
+    _followReturnModeActive = followReturnActive;
+    if (_followReturnModeActive) {
+        // Freeze the loss-return entry point. Continuing coordinate updates
+        // must move only the aircraft icon, never the displayed route.
+        _followReturnEntryCoordinate = _vehicle->coordinate();
+        _rebuildFollowReturnPlan();
     } else {
-        _setPlanCommitted(false);
-        _commitUncertain = false;
-        _setStateText(tr("Select loiter and landing points"));
+        _clearFollowReturnPlan();
     }
-
-    emit modeActiveChanged();
-    emit canExecuteChanged();
+    emit followReturnModeActiveChanged();
 }
 
 void CustomLandingController::_abortOperation(const QString& reason)
