@@ -113,9 +113,10 @@ Item {
         id: customLandingPanel
         anchors.right: parent.right
         anchors.rightMargin: _root.parentToolInsets.rightEdgeCenterInset + _root._panelMargin
-        anchors.verticalCenter: parent.verticalCenter
+        anchors.top: parent.top
+        anchors.topMargin: _root._panelMargin
         z: QGroundControl.zOrderTopMost
-        visible: _root._customLandingVisible
+        visible: _root._customLandingVisible && !customLandingController.planCommitted
 
         controller: customLandingController
         loiterCoordinateValid: customLandingMapVisual.loiterCoordinateValid

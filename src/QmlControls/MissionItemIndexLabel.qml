@@ -11,6 +11,7 @@ Canvas {
     height: _height
 
     signal clicked(point position)
+    signal trailingActionClicked()
 
     property string label                           ///< Label to show to the side of the index indicator
     property int    index:                  0       ///< Index to show in the indicator, 0 will show single char label instead, -1 first char of label in indicator full label to the side
@@ -26,6 +27,9 @@ Canvas {
     property real   vehicleYaw
     property bool   showGimbalYaw:          false
     property bool   showSequenceNumbers:    true
+    property bool   trailingActionVisible:  false
+    property url    trailingActionIconSource
+    property string trailingActionToolTip
 
     property real   _width:             showGimbalYaw ? Math.max(_gimbalYawWidth, labelControl.visible ? labelControl.width : indicator.width) : (labelControl.visible ? labelControl.width : indicator.width)
     property real   _height:            showGimbalYaw ? _gimbalYawWidth : (labelControl.visible ? labelControl.height : indicator.height)
@@ -39,6 +43,7 @@ Canvas {
     property real   _gimbalRadians:     degreesToRadians(vehicleYaw + gimbalYaw - 90)
     property real   _labelMargin:       2
     property real   _labelRadius:       _indicatorRadius + _labelMargin
+    property real   _trailingActionExtraWidth: trailingActionVisible ? indicator.height + (_labelMargin * 2) : 0
     property string _label:             label.length > 1 ? label : ""
     property string _index:             index === 0 || index === -1 ? label.charAt(0) : (showSequenceNumbers ? index : "")
 
@@ -78,7 +83,7 @@ Canvas {
     Rectangle {
         id:                     labelControl
         anchors.leftMargin:     -((_labelMargin * 2) + indicator.width)
-        anchors.rightMargin:    -(_labelMargin * 2)
+        anchors.rightMargin:    -((_labelMargin * 2) + _trailingActionExtraWidth)
         anchors.fill:           labelControlLabel
         color:                  "white"
         opacity:                0.5
@@ -98,6 +103,34 @@ Canvas {
         text:                   _label
         verticalAlignment:      Text.AlignVCenter
         visible:                labelControl.visible
+    }
+
+    Item {
+        id:                     trailingAction
+        anchors.left:           labelControlLabel.right
+        anchors.leftMargin:     root._labelMargin
+        anchors.verticalCenter: indicator.verticalCenter
+        width:                  indicator.height
+        height:                 indicator.height
+        visible:                labelControl.visible && root.trailingActionVisible && root.trailingActionIconSource.toString().length > 0
+
+        Image {
+            anchors.centerIn: parent
+            width:            parent.width * 0.68
+            height:           width
+            source:           root.trailingActionIconSource
+            fillMode:         Image.PreserveAspectFit
+        }
+
+        ToolTip.visible: trailingActionMouse.containsMouse && root.trailingActionToolTip.length > 0
+        ToolTip.text:    root.trailingActionToolTip
+
+        QGCMouseArea {
+            id:             trailingActionMouse
+            anchors.fill:   parent
+            hoverEnabled:   !ScreenTools.isMobile
+            onClicked:      root.trailingActionClicked()
+        }
     }
 
     Rectangle {

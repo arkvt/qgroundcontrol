@@ -368,7 +368,12 @@ void CustomLandingController::setLoiterHeightAboveLanding(double height)
 
 void CustomLandingController::setLoiterRadius(double radius)
 {
-    if (_busy || _planCommitted || _commitUncertain || fuzzyEqual(radius, _loiterRadius)) {
+    if (_busy || _planCommitted || _commitUncertain || !std::isfinite(radius)) {
+        return;
+    }
+
+    const double constrainedRadius = std::clamp(radius, _minimumLoiterRadius, kMaximumLoiterRadius);
+    if (fuzzyEqual(constrainedRadius, _loiterRadius)) {
         return;
     }
 
@@ -376,7 +381,7 @@ void CustomLandingController::setLoiterRadius(double radius)
         ? _landingCoordinate.azimuthTo(_loiterCoordinate)
         : std::numeric_limits<double>::quiet_NaN();
 
-    _loiterRadius = radius;
+    _loiterRadius = constrainedRadius;
     emit loiterRadiusChanged();
     if (std::isfinite(loiterBearing)) {
         const QGeoCoordinate projectedLoiter = _projectLoiterAtBearing(loiterBearing);

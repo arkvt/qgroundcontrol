@@ -124,14 +124,6 @@ Rectangle {
         _confirmationDialog.open()
     }
 
-    function _openCancelConfirmation() {
-        if (!controller || !controller.modeActive || _confirmationDialog) {
-            return
-        }
-        _confirmationDialog = cancelConfirmationComponent.createObject(mainWindow)
-        _confirmationDialog.open()
-    }
-
     onVisibleChanged: {
         if (!visible && _confirmationDialog) {
             _confirmationDialog.close()
@@ -197,6 +189,10 @@ Rectangle {
                 var parsedValue = numericRow.allowUnset && String(text).trim().length === 0
                         ? NaN
                         : _root._parsedNumber(text, numericRow.value)
+                if (isFinite(parsedValue)) {
+                    parsedValue = Math.max(numericRow.minimumValue,
+                                           Math.min(numericRow.maximumValue, parsedValue))
+                }
                 numericRow.valueEdited(parsedValue)
                 text = Qt.binding(function() { return numericRow.formattedValue() })
                 focus = false
@@ -275,28 +271,6 @@ Rectangle {
                 text: _root.instructionText
                 wrapMode: Text.WordWrap
                 color: "white"
-            }
-
-            RowLayout {
-                Layout.fillWidth: true
-                spacing: ScreenTools.defaultFontPixelWidth * 0.45
-
-                Rectangle {
-                    Layout.preferredWidth: ScreenTools.defaultFontPixelWidth * 0.65
-                    Layout.preferredHeight: width
-                    radius: width / 2
-                    color: controller && controller.planCommitted ? qgcPal.colorGreen : qgcPal.mapIndicator
-                }
-
-                QGCLabel {
-                    Layout.fillWidth: true
-                    text: controller && controller.stateText.length > 0
-                              ? controller.stateText
-                              : qsTr("Draft not committed")
-                    elide: Text.ElideRight
-                    color: Qt.rgba(1, 1, 1, 0.72)
-                    font.pointSize: ScreenTools.smallFontPointSize
-                }
             }
 
             QGCLabel {
@@ -378,8 +352,23 @@ Rectangle {
                         }
 
                         QGCButton {
-                            text: qsTr("Sync altitude")
+                            readonly property real buttonSize: Math.round(ScreenTools.defaultFontPixelHeight * 1.55)
+
+                            Layout.alignment: Qt.AlignRight | Qt.AlignVCenter
+                            Layout.minimumWidth: buttonSize
+                            Layout.maximumWidth: buttonSize
+                            Layout.preferredWidth: buttonSize
+                            Layout.minimumHeight: buttonSize
+                            Layout.maximumHeight: buttonSize
+                            Layout.preferredHeight: buttonSize
+                            leftPadding: 0
+                            rightPadding: 0
+                            topPadding: 0
+                            bottomPadding: 0
+                            iconSource: "qrc:/InstrumentValueIcons/refresh.svg"
                             enabled: _root.draftEditable && controller && controller.rtkAltitudeAvailable
+                            ToolTip.visible: hovered
+                            ToolTip.text: qsTr("Sync altitude")
                             onClicked: controller.readCurrentRtkAltitude()
                         }
                     }
@@ -493,24 +482,6 @@ Rectangle {
 
             SectionDivider { }
 
-            NumericFieldRow {
-                label: qsTr("Tangent distance")
-                value: controller ? controller.tangentDistance : 300
-                units: qsTr("m")
-                editable: false
-            }
-
-            NumericFieldRow {
-                label: qsTr("Approach airspeed")
-                value: controller ? controller.approachAirspeed : 0
-                units: qsTr("m/s")
-                minimumValue: 0
-                maximumValue: 200
-                editable: _root.draftEditable
-                allowUnset: true
-                onValueEdited: (newValue) => controller.approachAirspeed = newValue
-            }
-
             QGCLabel {
                 Layout.fillWidth: true
                 text: qsTr("Landing elevation and loiter height are converted to Home-relative altitudes when uploaded.")
@@ -521,28 +492,9 @@ Rectangle {
 
             SectionDivider { }
 
-            RowLayout {
-                Layout.fillWidth: true
-                spacing: ScreenTools.defaultFontPixelWidth * 0.5
-
-                QGCButton {
-                    Layout.fillWidth: true
-                    text: qsTr("Reset points")
-                    enabled: _root.draftEditable && (_root.loiterCoordinateValid || _root.landingCoordinateValid)
-                    onClicked: controller.resetDraft()
-                }
-
-                QGCButton {
-                    Layout.fillWidth: true
-                    text: controller && controller.planCommitted ? qsTr("Abort landing") : qsTr("Cancel")
-                    enabled: controller && controller.modeActive
-                    onClicked: _root._openCancelConfirmation()
-                }
-            }
-
             QGCButton {
                 Layout.fillWidth: true
-                text: controller && controller.planCommitted ? qsTr("Plan committed") : qsTr("Review and execute")
+                text: qsTr("Review and execute")
                 enabled: _root.executionAllowed
                 onClicked: _root._openExecuteConfirmation()
             }
@@ -589,41 +541,13 @@ Rectangle {
                                                    .arg(_root.controller.clockwise ? qsTr("clockwise")
                                                                                   : qsTr("counter-clockwise"))
                     }
-                    QGCLabel { text: qsTr("Tangent distance") }
-                    QGCLabel { text: qsTr("%1 m").arg(_root._numberText(_root.controller.tangentDistance, 1)) }
                     QGCLabel { text: qsTr("Landing point") }
                     QGCLabel { text: _root._coordinateText(_root.controller.landingCoordinate) }
                     QGCLabel { text: qsTr("Landing elevation AMSL") }
                     QGCLabel { text: qsTr("%1 m").arg(_root._numberText(_root.controller.landingElevation, 1)) }
-                    QGCLabel { text: qsTr("Approach airspeed") }
-                    QGCLabel {
-                        text: isFinite(Number(_root.controller.approachAirspeed))
-                                  ? qsTr("%1 m/s").arg(_root._numberText(_root.controller.approachAirspeed, 1))
-                                  : qsTr("Flight controller default")
-                    }
                 }
             }
         }
     }
 
-    Component {
-        id: cancelConfirmationComponent
-
-        QGCPopupDialog {
-            title: _root.controller && _root.controller.planCommitted
-                       ? qsTr("Abort Custom Landing?")
-                       : qsTr("Cancel Custom Landing?")
-            buttons: Dialog.Yes | Dialog.Cancel
-
-            onAccepted: _root.controller.cancel()
-            onClosed: _root._confirmationDialog = undefined
-
-            QGCLabel {
-                text: _root.controller && _root.controller.planCommitted
-                          ? qsTr("Cancel is accepted before VTOL approach starts and then holds in Custom Landing. After VTOL approach starts it is denied; explicitly select QLOITER or QRTL if an abort is required.")
-                          : qsTr("The draft will not execute. The flight controller will leave the planning hold using its configured cancel behavior.")
-                wrapMode: Text.WordWrap
-            }
-        }
-    }
 }

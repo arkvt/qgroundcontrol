@@ -8,6 +8,8 @@
  ****************************************************************************/
 
 import QtQuick
+import QtQuick.Controls
+import QtQuick.Dialogs
 import QtLocation
 import QtPositioning
 import QtQuick.Shapes
@@ -85,6 +87,8 @@ Item {
     property var _loiterDragArea
     property var _landingDragArea
     property int _selectedMarker: 0
+    property var _confirmationDialog
+    property bool _abortCommandPending: false
 
     QGCDynamicObjectManager {
         id: visualObjectManager
@@ -92,6 +96,15 @@ Item {
 
     function _coordinateValid(coordinate) {
         return coordinate !== undefined && coordinate !== null && coordinate.isValid
+    }
+
+    function _openAbortConfirmation() {
+        if (!active || !controller || !controller.planCommitted || controller.busy || _confirmationDialog) {
+            return
+        }
+
+        _confirmationDialog = abortConfirmationComponent.createObject(mainWindow)
+        _confirmationDialog.open()
     }
 
     function _normalizedBearing(bearing) {
@@ -284,6 +297,11 @@ Item {
     onActiveChanged: {
         if (!active) {
             _selectedMarker = 0
+            _abortCommandPending = false
+            if (_confirmationDialog) {
+                _confirmationDialog.close()
+                _confirmationDialog = undefined
+            }
         }
         Qt.callLater(_updateInteractionObjects)
     }
@@ -312,6 +330,17 @@ Item {
 
         function onBusyChanged() {
             Qt.callLater(_root._updateInteractionObjects)
+
+            if (!_root._abortCommandPending || !_root.controller || _root.controller.busy) {
+                return
+            }
+
+            if (_root.controller.planCommitted && _root.controller.errorText.length > 0) {
+                mainWindow.showMessageDialog(
+                            qsTranslate("CustomLandingPanel", "Abort landing"),
+                            _root.controller.errorText)
+            }
+            _root._abortCommandPending = false
         }
 
         function onPlanCommittedChanged() {
@@ -581,7 +610,11 @@ Item {
                 label: qsTr("Loiter descent") + "  +"
                        + Number(_root.controller.loiterHeightAboveLanding).toFixed(1) + " " + qsTr("m")
                 checked: _root._selectedMarker === 2
+                trailingActionVisible: _root.controller && _root.controller.planCommitted
+                trailingActionIconSource: "/res/cancel.svg"
+                trailingActionToolTip: qsTranslate("CustomLandingPanel", "Abort landing")
                 onClicked: _root._selectedMarker = _root._selectedMarker === 2 ? 0 : 2
+                onTrailingActionClicked: _root._openAbortConfirmation()
             }
         }
     }
@@ -606,7 +639,33 @@ Item {
                               ? Number(_root.controller.landingElevation).toFixed(1) + " " + qsTr("m AMSL")
                               : qsTr("Not set"))
                 checked: _root._selectedMarker === 1
+                trailingActionVisible: _root.controller && _root.controller.planCommitted
+                trailingActionIconSource: "/res/cancel.svg"
+                trailingActionToolTip: qsTranslate("CustomLandingPanel", "Abort landing")
                 onClicked: _root._selectedMarker = _root._selectedMarker === 1 ? 0 : 1
+                onTrailingActionClicked: _root._openAbortConfirmation()
+            }
+        }
+    }
+
+    Component {
+        id: abortConfirmationComponent
+
+        QGCPopupDialog {
+            title: qsTranslate("CustomLandingPanel", "Abort Custom Landing?")
+            buttons: Dialog.Yes | Dialog.Cancel
+
+            onAccepted: {
+                _root._abortCommandPending = true
+                _root.controller.cancel()
+            }
+            onClosed: _root._confirmationDialog = undefined
+
+            QGCLabel {
+                text: qsTranslate(
+                          "CustomLandingPanel",
+                          "Cancel is accepted before VTOL approach starts and then holds in Custom Landing. After VTOL approach starts it is denied; explicitly select QLOITER or QRTL if an abort is required.")
+                wrapMode: Text.WordWrap
             }
         }
     }
