@@ -44,6 +44,7 @@ ArduPlaneFirmwarePlugin::ArduPlaneFirmwarePlugin(QObject *parent)
         { APMPlaneMode::LOITER2QLAND  , _loiter2qlandFlightMode },
         { APMPlaneMode::FOLLOW_TARGET , _followTargetFlightMode },
         { APMPlaneMode::CUSTOM_LAND   , _customLandFlightMode   },
+        { APMPlaneMode::FOLLOW_RETURN , _followReturnFlightMode },
         
     });
 
@@ -76,6 +77,7 @@ ArduPlaneFirmwarePlugin::ArduPlaneFirmwarePlugin(QObject *parent)
         { _loiter2qlandFlightMode , APMPlaneMode::LOITER2QLAND  , true , true },
         { _followTargetFlightMode , APMPlaneMode::FOLLOW_TARGET , true , true },
         { _customLandFlightMode   , APMPlaneMode::CUSTOM_LAND   , true , true },
+        { _followReturnFlightMode , APMPlaneMode::FOLLOW_RETURN , false, true },
     };
     updateAvailableFlightModes(availableFlightModes);
 

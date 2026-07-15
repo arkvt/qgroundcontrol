@@ -28,11 +28,19 @@ Item {
     property var map
     property var controller
     property bool active: false
+    property var entryCoordinate: QtPositioning.coordinate()
+    property bool readOnly: false
+    property bool showConstraintCircle: true
+    property bool showEntryLoiterCircle: false
+    property color routePathColor: QGroundControl.globalPalette.mapMissionTrajectory
+    property real routePathWidth: 3
+    property real routePathOpacity: 1.0
 
     readonly property bool loiterCoordinateValid: _coordinateValid(controller ? controller.loiterCoordinate : undefined)
     readonly property bool landingCoordinateValid: _coordinateValid(controller ? controller.landingCoordinate : undefined)
+    readonly property bool entryCoordinateValid: _coordinateValid(entryCoordinate)
     readonly property bool draftComplete: loiterCoordinateValid && landingCoordinateValid
-    readonly property bool interactive: active && controller && controller.modeActive && controller.capabilitySupported
+    readonly property bool interactive: !readOnly && active && controller && controller.modeActive && controller.capabilitySupported
                                         && !controller.busy && !controller.planCommitted
     readonly property real loiterRadiusMeters: controller ? Math.max(0, Number(controller.loiterRadius)) : 0
     readonly property real tangentDistanceMeters: controller ? Number(controller.tangentDistance) : 300
@@ -61,10 +69,17 @@ Item {
     readonly property var approachPath: geometryValid
                                             ? [tangentCoordinate, controller.landingCoordinate]
                                             : []
+    readonly property var returnCircleEntryCoordinate: _calculateReturnCircleEntryCoordinate()
+    readonly property var returnStartCoordinate: _calculateReturnStartCoordinate()
+    readonly property var returnPath: geometryValid && entryCoordinateValid
+                                          && _coordinateValid(returnStartCoordinate)
+                                          && _coordinateValid(returnCircleEntryCoordinate)
+                                      ? [returnStartCoordinate, returnCircleEntryCoordinate]
+                                      : []
 
-    readonly property int   loiterPathWidth:   14
-    readonly property color loiterPathColor:   "#f4b942"
-    readonly property real  loiterPathOpacity: 0.48
+    readonly property int   loiterPathWidth:   40
+    readonly property color loiterPathColor:   "#ffd400"
+    readonly property real  loiterPathOpacity: 0.75
 
     property var _mapClickArea
     property var _loiterMarker
@@ -116,6 +131,34 @@ Item {
         return tangent
     }
 
+    function _calculateReturnCircleEntryCoordinate() {
+        if (!geometryValid || !entryCoordinateValid) {
+            return QtPositioning.coordinate()
+        }
+
+        var center = controller.loiterCoordinate
+        var entryBearing = center.azimuthTo(entryCoordinate)
+        var circleEntry = center.atDistanceAndAzimuth(loiterRadiusMeters,
+                                                       _normalizedBearing(entryBearing))
+        circleEntry.altitude = Number(controller.loiterAltitude)
+        return circleEntry
+    }
+
+    function _calculateReturnStartCoordinate() {
+        if (!entryCoordinateValid) {
+            return QtPositioning.coordinate()
+        }
+        if (!showEntryLoiterCircle || !loiterCoordinateValid || loiterRadiusMeters <= 0) {
+            return entryCoordinate
+        }
+
+        var departureBearing = entryCoordinate.azimuthTo(controller.loiterCoordinate)
+        var departure = entryCoordinate.atDistanceAndAzimuth(loiterRadiusMeters,
+                                                              _normalizedBearing(departureBearing))
+        departure.altitude = entryCoordinate.altitude
+        return departure
+    }
+
     function _circleCoordinate(bearing) {
         if (!loiterCoordinateValid || loiterRadiusMeters <= 0) {
             return QtPositioning.coordinate()
@@ -143,7 +186,9 @@ Item {
         _landingMarker = visualObjectManager.createObject(landingMarkerComponent, map, true /* parentObjectIsMap */)
         visualObjectManager.createObjects([
             tangentDistanceCircleComponent,
+            entryLoiterCircleComponent,
             loiterCircleComponent,
+            returnLineComponent,
             directionArrowComponent,
             airbrakeCircleComponent,
             airbrakeLabelComponent,
@@ -164,6 +209,11 @@ Item {
 
     function _syncDragAreas() {
         if (!active || !map || !_loiterMarker || !_landingMarker) {
+            return
+        }
+
+        if (!interactive) {
+            _hideDragAreas()
             return
         }
 
@@ -390,8 +440,24 @@ Item {
             border.width: 1
             border.color: Qt.rgba(1, 1, 1, 0.55)
             color: "transparent"
-            visible: _root.active && _root.landingCoordinateValid
+            visible: _root.active && _root.showConstraintCircle && _root.landingCoordinateValid
                      && _root.tangentDistanceMeters > 0
+        }
+    }
+
+    Component {
+        id: entryLoiterCircleComponent
+
+        MapCircle {
+            z: QGroundControl.zOrderMapItems - 2
+            center: _root.entryCoordinate
+            radius: _root.loiterRadiusMeters
+            border.width: _root.loiterPathWidth
+            border.color: _root.loiterPathColor
+            color: "transparent"
+            opacity: _root.loiterPathOpacity
+            visible: _root.active && _root.showEntryLoiterCircle
+                     && _root.entryCoordinateValid && _root.loiterRadiusMeters > 0
         }
     }
 
@@ -407,6 +473,19 @@ Item {
             color: "transparent"
             opacity: _root.loiterPathOpacity
             visible: _root.active && _root.loiterCoordinateValid && _root.loiterRadiusMeters > 0
+        }
+    }
+
+    Component {
+        id: returnLineComponent
+
+        MapPolyline {
+            z: QGroundControl.zOrderMapItems - 1
+            line.color: _root.routePathColor
+            line.width: _root.routePathWidth
+            opacity: _root.routePathOpacity
+            path: _root.returnPath
+            visible: _root.active && _root.returnPath.length === 2
         }
     }
 
@@ -450,8 +529,9 @@ Item {
 
         MapPolyline {
             z: QGroundControl.zOrderMapItems - 1
-            line.color: QGroundControl.globalPalette.mapMissionTrajectory
-            line.width: 3
+            line.color: _root.routePathColor
+            line.width: _root.routePathWidth
+            opacity: _root.routePathOpacity
             path: _root.approachPath
             visible: _root.active && _root.geometryValid
         }
