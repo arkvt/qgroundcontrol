@@ -33,7 +33,7 @@ Item {
 
     readonly property int   _loiterPathWidth:   40
     readonly property color _loiterPathColor:   "#ffd400"
-    readonly property real  _loiterPathOpacity: 0.75
+    readonly property real  _loiterPathOpacity: 0.55
 
     signal clicked(int sequenceNumber)
 

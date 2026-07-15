@@ -77,7 +77,7 @@ Item {
 
     readonly property int   loiterPathWidth:   40
     readonly property color loiterPathColor:   "#ffd400"
-    readonly property real  loiterPathOpacity: 0.75
+    readonly property real  loiterPathOpacity: 0.55
 
     property var _mapClickArea
     property var _loiterMarker
