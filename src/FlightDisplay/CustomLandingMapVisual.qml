@@ -10,6 +10,7 @@
 import QtQuick
 import QtLocation
 import QtPositioning
+import QtQuick.Shapes
 
 import QGroundControl
 import QGroundControl.Controls
@@ -33,22 +34,28 @@ Item {
                                         && !controller.busy && !controller.planCommitted
     readonly property real loiterRadiusMeters: controller ? Math.max(0, Number(controller.loiterRadius)) : 0
     readonly property real tangentDistanceMeters: controller ? Number(controller.tangentDistance) : 300
-    readonly property real loiterConstraintRadiusMeters: loiterRadiusMeters > 0 && tangentDistanceMeters > 0
-                                                           ? Math.sqrt(loiterRadiusMeters * loiterRadiusMeters
-                                                                       + tangentDistanceMeters * tangentDistanceMeters)
-                                                           : 0
+    readonly property real airbrakeRadiusMeters: controller ? Math.max(0, Number(controller.airbrakeRadius)) : 0
+    readonly property real loiterCenterDistanceMeters: loiterRadiusMeters > 0 && tangentDistanceMeters > 0
+                                                         ? Math.sqrt(loiterRadiusMeters * loiterRadiusMeters
+                                                                     + tangentDistanceMeters * tangentDistanceMeters)
+                                                         : 0
     readonly property real geometryToleranceMeters: 1
     readonly property real centerToLandingDistance: draftComplete
                                                         ? controller.loiterCoordinate.distanceTo(controller.landingCoordinate)
                                                         : 0
     readonly property bool geometryValid: draftComplete && loiterRadiusMeters > 0
                                              && tangentDistanceMeters >= 30 && tangentDistanceMeters <= 5000
-                                             && Math.abs(centerToLandingDistance - loiterConstraintRadiusMeters)
+                                             && Math.abs(centerToLandingDistance - loiterCenterDistanceMeters)
                                                     <= geometryToleranceMeters
     readonly property string geometryError: draftComplete && !geometryValid
                                                 ? qsTr("Loiter descent point must remain on the fixed CLND_TAN_DIST constraint.")
                                                 : ""
     readonly property var tangentCoordinate: _calculateTangentCoordinate()
+    readonly property var directionArrowCoordinate: _circleCoordinate(0)
+    readonly property var airbrakeLabelCoordinate: landingCoordinateValid && airbrakeRadiusMeters > 0
+                                                        ? controller.landingCoordinate.atDistanceAndAzimuth(
+                                                              airbrakeRadiusMeters, 0)
+                                                        : QtPositioning.coordinate()
     readonly property var approachPath: geometryValid
                                             ? [tangentCoordinate, controller.landingCoordinate]
                                             : []
@@ -58,6 +65,7 @@ Item {
     property var _landingMarker
     property var _loiterDragArea
     property var _landingDragArea
+    property int _selectedMarker: 0
 
     QGCDynamicObjectManager {
         id: visualObjectManager
@@ -116,15 +124,14 @@ Item {
 
         _loiterMarker = visualObjectManager.createObject(loiterMarkerComponent, map, true /* parentObjectIsMap */)
         _landingMarker = visualObjectManager.createObject(landingMarkerComponent, map, true /* parentObjectIsMap */)
-
         visualObjectManager.createObjects([
-            loiterConstraintCircleComponent,
+            tangentDistanceCircleComponent,
             loiterCircleComponent,
+            directionArrowComponent,
+            airbrakeCircleComponent,
+            airbrakeLabelComponent,
             approachLineComponent,
-            tangentMarkerComponent,
-            directionArrowZeroComponent,
-            directionArrowOneTwentyComponent,
-            directionArrowTwoFortyComponent
+            tangentMarkerComponent
         ], map, true /* parentObjectIsMap */)
 
         _syncDragAreas()
@@ -151,9 +158,11 @@ Item {
             if (!_loiterDragArea) {
                 _loiterDragArea = loiterDragAreaComponent.createObject(map)
             }
-        } else if (_loiterDragArea) {
-            _loiterDragArea.destroy()
-            _loiterDragArea = undefined
+        } else {
+            if (_loiterDragArea) {
+                _loiterDragArea.destroy()
+                _loiterDragArea = undefined
+            }
         }
 
         if (landingCoordinateValid) {
@@ -218,7 +227,12 @@ Item {
         }
     }
 
-    onActiveChanged: Qt.callLater(_updateInteractionObjects)
+    onActiveChanged: {
+        if (!active) {
+            _selectedMarker = 0
+        }
+        Qt.callLater(_updateInteractionObjects)
+    }
     onMapChanged: Qt.callLater(function() {
         _hideVisuals()
         _updateInteractionObjects()
@@ -287,6 +301,8 @@ Item {
             z: QGroundControl.zOrderMapItems + 30
             visible: _root.interactive && _root.loiterCoordinateValid
 
+            onClicked: _root._selectedMarker = _root._selectedMarker === 2 ? 0 : 2
+
             onItemCoordinateChanged: {
                 if (_root.interactive && _root._coordinateValid(itemCoordinate)) {
                     var coordinate = itemCoordinate
@@ -313,6 +329,8 @@ Item {
             z: QGroundControl.zOrderMapItems + 30
             visible: _root.interactive && _root.landingCoordinateValid
 
+            onClicked: _root._selectedMarker = _root._selectedMarker === 1 ? 0 : 1
+
             onItemCoordinateChanged: {
                 if (_root.interactive && _root._coordinateValid(itemCoordinate)) {
                     var coordinate = itemCoordinate
@@ -328,17 +346,19 @@ Item {
     }
 
     Component {
-        id: loiterConstraintCircleComponent
+        id: tangentDistanceCircleComponent
 
         MapCircle {
             z: QGroundControl.zOrderMapItems - 3
             center: _root.controller ? _root.controller.landingCoordinate : QtPositioning.coordinate()
-            radius: _root.loiterConstraintRadiusMeters
+            // CLND_TAN_DIST constrains the tangent exit point, not the loiter
+            // center. The center itself remains sqrt(R^2 + D^2) away.
+            radius: _root.tangentDistanceMeters
             border.width: 1
-            border.color: Qt.rgba(0.29, 0.75, 1.0, 0.72)
-            color: Qt.rgba(0.29, 0.75, 1.0, 0.035)
+            border.color: Qt.rgba(1, 1, 1, 0.55)
+            color: "transparent"
             visible: _root.active && _root.landingCoordinateValid
-                     && _root.loiterConstraintRadiusMeters > 0
+                     && _root.tangentDistanceMeters > 0
         }
     }
 
@@ -349,10 +369,45 @@ Item {
             z: QGroundControl.zOrderMapItems - 2
             center: _root.controller ? _root.controller.loiterCoordinate : QtPositioning.coordinate()
             radius: _root.loiterRadiusMeters
-            border.width: 3
-            border.color: "#f4b942"
-            color: Qt.rgba(0.96, 0.73, 0.26, 0.12)
+            border.width: 2
+            border.color: QGroundControl.globalPalette.mapMissionTrajectory
+            color: "transparent"
             visible: _root.active && _root.loiterCoordinateValid && _root.loiterRadiusMeters > 0
+        }
+    }
+
+    Component {
+        id: directionArrowComponent
+
+        MapQuickItem {
+            z: QGroundControl.zOrderMapItems
+            coordinate: _root.directionArrowCoordinate
+            anchorPoint.x: sourceItem.width / 2
+            anchorPoint.y: sourceItem.height / 2
+            visible: _root.active && _root.loiterCoordinateValid && _root.loiterRadiusMeters > 0
+
+            sourceItem: Shape {
+                width: Math.max(16, ScreenTools.defaultFontPixelHeight * 0.95)
+                height: width * 0.68
+
+                transform: Rotation {
+                    origin.x: width / 2
+                    origin.y: height / 2
+                    angle: (_root.controller && _root.controller.clockwise ? 180 : 0)
+                           - (_root.map && isFinite(Number(_root.map.bearing)) ? Number(_root.map.bearing) : 0)
+                }
+
+                ShapePath {
+                    strokeWidth: 0
+                    strokeColor: "transparent"
+                    fillColor: QGroundControl.globalPalette.mapMissionTrajectory
+                    startX: 0
+                    startY: height / 2
+                    PathLine { x: width; y: height }
+                    PathLine { x: width; y: 0 }
+                    PathLine { x: 0; y: height / 2 }
+                }
+            }
         }
     }
 
@@ -361,10 +416,44 @@ Item {
 
         MapPolyline {
             z: QGroundControl.zOrderMapItems - 1
-            line.color: "#ff7b32"
-            line.width: 4
+            line.color: QGroundControl.globalPalette.mapMissionTrajectory
+            line.width: 3
             path: _root.approachPath
             visible: _root.active && _root.geometryValid
+        }
+    }
+
+    Component {
+        id: airbrakeCircleComponent
+
+        MapCircle {
+            z: QGroundControl.zOrderMapItems - 2
+            center: _root.controller ? _root.controller.landingCoordinate : QtPositioning.coordinate()
+            radius: _root.airbrakeRadiusMeters
+            border.width: 1
+            border.color: Qt.rgba(1.0, 0.62, 0.26, 0.45)
+            color: "transparent"
+            visible: _root.active && _root.landingCoordinateValid && _root.airbrakeRadiusMeters > 0
+        }
+    }
+
+    Component {
+        id: airbrakeLabelComponent
+
+        MapQuickItem {
+            z: QGroundControl.zOrderMapItems
+            coordinate: _root.airbrakeLabelCoordinate
+            anchorPoint.x: sourceItem.width / 2
+            anchorPoint.y: sourceItem.height / 2
+            visible: _root.active && _root.landingCoordinateValid && _root.airbrakeRadiusMeters > 0
+
+            sourceItem: QGCLabel {
+                text: qsTr("Deceleration zone")
+                color: Qt.rgba(1.0, 0.72, 0.42, 0.82)
+                font.pointSize: ScreenTools.smallFontPointSize
+                style: Text.Outline
+                styleColor: "black"
+            }
         }
     }
 
@@ -379,110 +468,13 @@ Item {
             visible: _root.active && _root.geometryValid
 
             sourceItem: Rectangle {
-                width: Math.max(12, ScreenTools.defaultFontPixelWidth * 1.1)
+                width: Math.max(8, ScreenTools.defaultFontPixelWidth * 0.75)
                 height: width
                 radius: width / 2
-                color: "#ff7b32"
-                border.width: 2
+                color: QGroundControl.globalPalette.mapMissionTrajectory
+                border.width: 1
                 border.color: "white"
-
-                QGCLabel {
-                    anchors.left: parent.right
-                    anchors.leftMargin: ScreenTools.defaultFontPixelWidth * 0.4
-                    anchors.verticalCenter: parent.verticalCenter
-                    text: qsTr("Tangent exit")
-                    color: "white"
-                    style: Text.Outline
-                    styleColor: "black"
-                }
             }
-        }
-    }
-
-    component DirectionArrow: MapQuickItem {
-        property real radialBearing: 0
-
-        z: QGroundControl.zOrderMapItems
-        coordinate: _root._circleCoordinate(radialBearing)
-        anchorPoint.x: sourceItem.width / 2
-        anchorPoint.y: sourceItem.height / 2
-        visible: _root.active && _root.loiterCoordinateValid && _root.loiterRadiusMeters > 0
-
-        sourceItem: QGCLabel {
-            text: "\u27a4"
-            color: "#f4b942"
-            font.bold: true
-            font.pointSize: ScreenTools.defaultFontPointSize * 1.5
-            style: Text.Outline
-            styleColor: "black"
-            // The glyph points east at zero rotation. A clockwise tangent at
-            // radial bearing b points b+90 degrees, hence rotation=b.
-            rotation: _root.controller && _root.controller.clockwise
-                          ? radialBearing
-                          : radialBearing + 180
-        }
-    }
-
-    Component {
-        id: directionArrowZeroComponent
-        DirectionArrow { radialBearing: 0 }
-    }
-
-    Component {
-        id: directionArrowOneTwentyComponent
-        DirectionArrow { radialBearing: 120 }
-    }
-
-    Component {
-        id: directionArrowTwoFortyComponent
-        DirectionArrow { radialBearing: 240 }
-    }
-
-    component LandingMarker: Item {
-        id: markerRoot
-
-        property color markerColor: "#f4b942"
-        property string title
-        property string altitudeText
-        property real anchorPointX: width / 2
-        property real anchorPointY: height - markerDot.height / 2
-
-        width: Math.max(markerLabel.implicitWidth + ScreenTools.defaultFontPixelWidth,
-                        ScreenTools.minTouchPixels)
-        height: markerLabel.implicitHeight + markerDot.height + ScreenTools.defaultFontPixelHeight * 0.2
-
-        Rectangle {
-            id: markerLabel
-            anchors.top: parent.top
-            anchors.horizontalCenter: parent.horizontalCenter
-            width: markerText.implicitWidth + ScreenTools.defaultFontPixelWidth
-            height: markerText.implicitHeight + ScreenTools.defaultFontPixelHeight * 0.35
-            radius: ScreenTools.defaultFontPixelWidth * 0.45
-            color: Qt.rgba(0.06, 0.08, 0.11, 0.9)
-            border.width: 2
-            border.color: markerRoot.markerColor
-
-            QGCLabel {
-                id: markerText
-                anchors.centerIn: parent
-                text: markerRoot.title + "\n" + markerRoot.altitudeText
-                color: "white"
-                horizontalAlignment: Text.AlignHCenter
-                font.bold: true
-            }
-        }
-
-        Rectangle {
-            id: markerDot
-            anchors.top: markerLabel.bottom
-            anchors.topMargin: ScreenTools.defaultFontPixelHeight * 0.2
-            anchors.horizontalCenter: parent.horizontalCenter
-            width: Math.max(16, ScreenTools.defaultFontPixelWidth * 1.35)
-            height: width
-            radius: width / 2
-            color: markerRoot.markerColor
-            border.width: 2
-            border.color: "white"
         }
     }
 
@@ -498,11 +490,13 @@ Item {
             anchorPoint.y: loiterMarkerSource.anchorPointY
             visible: _root.active && _root.loiterCoordinateValid
 
-            sourceItem: LandingMarker {
+            sourceItem: MissionItemIndexLabel {
                 id: loiterMarkerSource
-                markerColor: "#f4b942"
-                title: qsTr("Loiter descent")
-                altitudeText: qsTr("%1 m").arg(Number(_root.controller.loiterAltitude).toFixed(1))
+                index: 2
+                label: qsTr("Loiter descent") + "  +"
+                       + Number(_root.controller.loiterHeightAboveLanding).toFixed(1) + " " + qsTr("m")
+                checked: _root._selectedMarker === 2
+                onClicked: _root._selectedMarker = _root._selectedMarker === 2 ? 0 : 2
             }
         }
     }
@@ -519,11 +513,15 @@ Item {
             anchorPoint.y: landingMarkerSource.anchorPointY
             visible: _root.active && _root.landingCoordinateValid
 
-            sourceItem: LandingMarker {
+            sourceItem: MissionItemIndexLabel {
                 id: landingMarkerSource
-                markerColor: "#4bc0ff"
-                title: qsTr("Vertical land")
-                altitudeText: qsTr("%1 m").arg(Number(_root.controller.landingAltitude).toFixed(1))
+                index: 1
+                label: qsTr("Vertical land") + "  "
+                       + (isFinite(Number(_root.controller.landingElevation))
+                              ? Number(_root.controller.landingElevation).toFixed(1) + " " + qsTr("m AMSL")
+                              : qsTr("Not set"))
+                checked: _root._selectedMarker === 1
+                onClicked: _root._selectedMarker = _root._selectedMarker === 1 ? 0 : 1
             }
         }
     }

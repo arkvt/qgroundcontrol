@@ -13,6 +13,7 @@
 #include "MAVLinkLib.h"
 #include "MultiVehicleManager.h"
 #include "ParameterManager.h"
+#include "PositionManager.h"
 #include "QGCLoggingCategory.h"
 #include "Vehicle.h"
 #include "VehicleLinkManager.h"
@@ -21,6 +22,7 @@
 #include <QtCore/QRandomGenerator>
 #include <QtCore/QTimer>
 
+#include <algorithm>
 #include <cmath>
 #include <memory>
 
@@ -76,6 +78,11 @@ struct CustomLandingCommandContext
 CustomLandingController::CustomLandingController(QObject* parent)
     : QObject(parent)
 {
+    QGCPositionManager* const positionManager = QGCPositionManager::instance();
+    connect(positionManager, &QGCPositionManager::positionInfoUpdated,
+            this, &CustomLandingController::_gcsPositionInfoUpdated);
+    _gcsPositionInfoUpdated(positionManager->geoPositionInfo());
+
     MultiVehicleManager* const manager = MultiVehicleManager::instance();
     connect(manager, &MultiVehicleManager::activeVehicleChanged, this, &CustomLandingController::_activeVehicleChanged);
     setVehicle(manager->activeVehicle());
@@ -93,6 +100,18 @@ void CustomLandingController::setVehicle(Vehicle* vehicle)
     }
 
     _abortOperation(QString());
+    if (_loiterRadiusFact) {
+        disconnect(_loiterRadiusFact, nullptr, this, nullptr);
+        _loiterRadiusFact.clear();
+    }
+    if (_cruiseAirspeedFact) {
+        disconnect(_cruiseAirspeedFact, nullptr, this, nullptr);
+        _cruiseAirspeedFact.clear();
+    }
+    if (_transitionDecelFact) {
+        disconnect(_transitionDecelFact, nullptr, this, nullptr);
+        _transitionDecelFact.clear();
+    }
     if (_tangentDistanceFact) {
         disconnect(_tangentDistanceFact, nullptr, this, nullptr);
         _tangentDistanceFact.clear();
@@ -105,41 +124,73 @@ void CustomLandingController::setVehicle(Vehicle* vehicle)
         disconnect(_vehicle, nullptr, this, nullptr);
     }
 
+    const bool hadHomeAltitude = std::isfinite(_homeAltitude);
+    const bool hadLandingElevation = std::isfinite(_landingElevation);
     _vehicle = vehicle;
+    _homeAltitude = std::numeric_limits<double>::quiet_NaN();
+    _landingElevation = std::numeric_limits<double>::quiet_NaN();
     _setCapabilitySupported(false);
     _setPlanCommitted(false);
     _commitUncertain = false;
     _hasPendingTangentDistance = false;
+    _cruiseAirspeed = 0.0;
+    _transitionDecel = 0.0;
     _setPlanIdentity(0, 0);
 
     // Never carry a vehicle-specific geometry parameter to another vehicle.
-    // A firmware without CLND_TAN_DIST uses the protocol default of 300 m.
+    // Firmware without these parameters uses the protocol fallback values.
+    _setLoiterRadiusFromVehicle(kFallbackLoiterRadius);
     _setTangentDistanceFromVehicle(kDefaultTangentDistance);
+    _clearDraft();
 
     if (_vehicle) {
         connect(_vehicle, &Vehicle::flightModeChanged, this, [this](const QString&) { _flightModeChanged(); });
+        connect(_vehicle, &Vehicle::homePositionChanged, this, [this](const QGeoCoordinate&) { _homePositionChanged(); });
         connect(_vehicle, &QObject::destroyed, this, [this]() { setVehicle(nullptr); });
+        connect(_vehicle->groundSpeed(), &Fact::rawValueChanged, this,
+                [this](const QVariant&) { emit airbrakeRadiusChanged(); });
+
+        _homePositionChanged();
 
         _parameterManager = _vehicle->parameterManager();
         connect(_parameterManager, &ParameterManager::parametersReadyChanged, this,
                 [this](bool parametersReady) {
                     if (parametersReady) {
+                        _refreshLoiterRadiusParameter();
+                        _refreshAirbrakeParameters();
                         _refreshTangentDistanceParameter();
                     }
                 });
         connect(_parameterManager, &ParameterManager::factAdded, this,
                 [this](int, Fact* fact) {
-                    if (fact && fact->name() == QStringLiteral("CLND_TAN_DIST")) {
-                        _refreshTangentDistanceParameter();
+                    if (fact) {
+                        if (fact->name() == QStringLiteral("WP_LOITER_RAD")) {
+                            _refreshLoiterRadiusParameter();
+                        } else if (fact->name() == QStringLiteral("AIRSPEED_CRUISE") ||
+                                   fact->name() == QStringLiteral("Q_TRANS_DECEL")) {
+                            _refreshAirbrakeParameters();
+                        } else if (fact->name() == QStringLiteral("CLND_TAN_DIST")) {
+                            _refreshTangentDistanceParameter();
+                        }
                     }
                 });
+        _refreshLoiterRadiusParameter();
+        _refreshAirbrakeParameters();
         _refreshTangentDistanceParameter();
+    } else {
+        if (hadHomeAltitude) {
+            emit homeAltitudeChanged();
+        }
+        if (hadLandingElevation) {
+            emit landingElevationChanged();
+        }
     }
 
     _updateModeActive();
     _setErrorText(QString());
     _setStateText(_vehicle ? tr("Query Custom Landing capability") : tr("No active vehicle"));
     emit vehicleChanged();
+    emit airbrakeRadiusChanged();
     emit canExecuteChanged();
 }
 
@@ -214,6 +265,11 @@ void CustomLandingController::setLoiterAltitude(double altitude)
     }
 
     _loiterAltitude = altitude;
+    const double heightAboveLanding = altitude - _landingAltitude;
+    if (!fuzzyEqual(heightAboveLanding, _loiterHeightAboveLanding)) {
+        _loiterHeightAboveLanding = heightAboveLanding;
+        emit loiterHeightAboveLandingChanged();
+    }
     emit loiterAltitudeChanged();
     _draftChanged();
 }
@@ -225,8 +281,42 @@ void CustomLandingController::setLandingAltitude(double altitude)
     }
 
     _landingAltitude = altitude;
+    if (std::isfinite(_homeAltitude)) {
+        const double elevation = _homeAltitude + altitude;
+        if (!fuzzyEqual(elevation, _landingElevation)) {
+            _landingElevation = elevation;
+            emit landingElevationChanged();
+        }
+    }
+    const double loiterAltitude = altitude + _loiterHeightAboveLanding;
+    if (!fuzzyEqual(loiterAltitude, _loiterAltitude)) {
+        _loiterAltitude = loiterAltitude;
+        emit loiterAltitudeChanged();
+    }
     emit landingAltitudeChanged();
     _draftChanged();
+}
+
+void CustomLandingController::setLandingElevation(double elevation)
+{
+    if (_busy || _planCommitted || _commitUncertain || fuzzyEqual(elevation, _landingElevation)) {
+        return;
+    }
+
+    _landingElevation = elevation;
+    emit landingElevationChanged();
+    _syncProtocolAltitudesFromDisplay(true);
+}
+
+void CustomLandingController::setLoiterHeightAboveLanding(double height)
+{
+    if (_busy || _planCommitted || _commitUncertain || fuzzyEqual(height, _loiterHeightAboveLanding)) {
+        return;
+    }
+
+    _loiterHeightAboveLanding = height;
+    emit loiterHeightAboveLandingChanged();
+    _syncProtocolAltitudesFromDisplay(true);
 }
 
 void CustomLandingController::setLoiterRadius(double radius)
@@ -271,6 +361,136 @@ void CustomLandingController::setClockwise(bool clockwise)
     _clockwise = clockwise;
     emit clockwiseChanged();
     _draftChanged();
+}
+
+void CustomLandingController::_refreshLoiterRadiusParameter()
+{
+    if (!_vehicle || !_parameterManager) {
+        return;
+    }
+
+    if (!_parameterManager->parameterExists(ParameterManager::defaultComponentId,
+                                             QStringLiteral("WP_LOITER_RAD"))) {
+        if (_parameterManager->parametersReady()) {
+            _setLoiterRadiusFromVehicle(kFallbackLoiterRadius);
+        }
+        return;
+    }
+
+    Fact* const fact = _parameterManager->getParameter(ParameterManager::defaultComponentId,
+                                                        QStringLiteral("WP_LOITER_RAD"));
+    if (_loiterRadiusFact != fact) {
+        if (_loiterRadiusFact) {
+            disconnect(_loiterRadiusFact, nullptr, this, nullptr);
+        }
+        _loiterRadiusFact = fact;
+        connect(fact, &Fact::rawValueChanged, this, [this](const QVariant& value) {
+            bool conversionOk = false;
+            const double radius = value.toDouble(&conversionOk);
+            _setLoiterRadiusFromVehicle(conversionOk
+                                            ? radius
+                                            : std::numeric_limits<double>::quiet_NaN());
+        });
+    }
+
+    bool conversionOk = false;
+    const double radius = fact->rawValue().toDouble(&conversionOk);
+    _setLoiterRadiusFromVehicle(conversionOk
+                                    ? radius
+                                    : std::numeric_limits<double>::quiet_NaN());
+}
+
+void CustomLandingController::_setLoiterRadiusFromVehicle(double radius)
+{
+    const double absoluteRadius = std::abs(radius);
+    const double vehicleRadius = std::isfinite(absoluteRadius) && absoluteRadius >= 10.0
+        ? std::min(absoluteRadius, kMaximumLoiterRadius)
+        : kFallbackLoiterRadius;
+    const double previousMinimum = _minimumLoiterRadius;
+
+    if (!fuzzyEqual(vehicleRadius, _minimumLoiterRadius)) {
+        _minimumLoiterRadius = vehicleRadius;
+        emit minimumLoiterRadiusChanged();
+    }
+
+    const bool usingPreviousDefault = fuzzyEqual(_loiterRadius, previousMinimum) ||
+                                      fuzzyEqual(_loiterRadius, kFallbackLoiterRadius);
+    if ((_loiterRadius < _minimumLoiterRadius) ||
+        (usingPreviousDefault && !_loiterCoordinate.isValid() && !_landingCoordinate.isValid())) {
+        setLoiterRadius(_minimumLoiterRadius);
+    } else {
+        emit canExecuteChanged();
+    }
+}
+
+double CustomLandingController::airbrakeRadius() const
+{
+    if (!_vehicle || !std::isfinite(_cruiseAirspeed) || _cruiseAirspeed <= 0.0 ||
+        !std::isfinite(_transitionDecel) || _transitionDecel <= 0.0) {
+        return 0.0;
+    }
+
+    const double baseRadius = 1.5 * _cruiseAirspeed * _cruiseAirspeed /
+                              (2.0 * _transitionDecel);
+    bool conversionOk = false;
+    const double rawGroundSpeed = _vehicle->groundSpeed()->rawValue().toDouble(&conversionOk);
+    const double groundSpeed = conversionOk && std::isfinite(rawGroundSpeed)
+        ? std::max(0.0, rawGroundSpeed)
+        : 0.0;
+    const double dynamicRadius = groundSpeed * groundSpeed / (2.0 * _transitionDecel) +
+                                 2.0 * groundSpeed;
+    return std::max(baseRadius, dynamicRadius);
+}
+
+void CustomLandingController::_refreshAirbrakeParameters()
+{
+    if (!_vehicle || !_parameterManager) {
+        return;
+    }
+
+    if (_parameterManager->parameterExists(ParameterManager::defaultComponentId,
+                                            QStringLiteral("AIRSPEED_CRUISE"))) {
+        Fact* const fact = _parameterManager->getParameter(ParameterManager::defaultComponentId,
+                                                            QStringLiteral("AIRSPEED_CRUISE"));
+        if (_cruiseAirspeedFact != fact) {
+            if (_cruiseAirspeedFact) {
+                disconnect(_cruiseAirspeedFact, nullptr, this, nullptr);
+            }
+            _cruiseAirspeedFact = fact;
+            connect(fact, &Fact::rawValueChanged, this, [this](const QVariant& value) {
+                bool conversionOk = false;
+                const double airspeed = value.toDouble(&conversionOk);
+                _cruiseAirspeed = conversionOk ? airspeed : 0.0;
+                emit airbrakeRadiusChanged();
+            });
+        }
+        bool conversionOk = false;
+        const double airspeed = fact->rawValue().toDouble(&conversionOk);
+        _cruiseAirspeed = conversionOk ? airspeed : 0.0;
+    }
+
+    if (_parameterManager->parameterExists(ParameterManager::defaultComponentId,
+                                            QStringLiteral("Q_TRANS_DECEL"))) {
+        Fact* const fact = _parameterManager->getParameter(ParameterManager::defaultComponentId,
+                                                            QStringLiteral("Q_TRANS_DECEL"));
+        if (_transitionDecelFact != fact) {
+            if (_transitionDecelFact) {
+                disconnect(_transitionDecelFact, nullptr, this, nullptr);
+            }
+            _transitionDecelFact = fact;
+            connect(fact, &Fact::rawValueChanged, this, [this](const QVariant& value) {
+                bool conversionOk = false;
+                const double decel = value.toDouble(&conversionOk);
+                _transitionDecel = conversionOk ? decel : 0.0;
+                emit airbrakeRadiusChanged();
+            });
+        }
+        bool conversionOk = false;
+        const double decel = fact->rawValue().toDouble(&conversionOk);
+        _transitionDecel = conversionOk ? decel : 0.0;
+    }
+
+    emit airbrakeRadiusChanged();
 }
 
 void CustomLandingController::_refreshTangentDistanceParameter()
@@ -423,6 +643,8 @@ void CustomLandingController::execute()
         return;
     }
 
+    _homePositionChanged();
+
     QString validationError;
     if (!_validateDraft(validationError)) {
         _finishWithError(validationError);
@@ -455,7 +677,7 @@ void CustomLandingController::cancel()
     if (!_modeActive) {
         _setPlanCommitted(false);
         _commitUncertain = false;
-        _setPlanIdentity(0, 0);
+        _clearDraft();
         _setErrorText(QString());
         _setStateText(tr("Custom Landing mode is not active"));
         return;
@@ -478,47 +700,9 @@ void CustomLandingController::resetDraft()
         return;
     }
 
-    const bool loiterChanged = _loiterCoordinate.isValid();
-    const bool landingChanged = _landingCoordinate.isValid();
-    const bool loiterAltitudeChangedValue = !fuzzyEqual(_loiterAltitude, 50.0);
-    const bool landingAltitudeChangedValue = !fuzzyEqual(_landingAltitude, 0.0);
-    const bool radiusChanged = !fuzzyEqual(_loiterRadius, 100.0);
-    const bool airspeedChanged = !std::isnan(_approachAirspeed);
-    const bool clockwiseChangedValue = !_clockwise;
-
-    _loiterCoordinate = QGeoCoordinate();
-    _landingCoordinate = QGeoCoordinate();
-    _loiterAltitude = 50.0;
-    _landingAltitude = 0.0;
-    _loiterRadius = 100.0;
-    _approachAirspeed = std::numeric_limits<double>::quiet_NaN();
-    _clockwise = true;
-    _setPlanIdentity(0, 0);
+    _clearDraft();
     _setErrorText(QString());
     _setStateText(_modeActive ? tr("Select loiter and landing points") : tr("Custom Landing mode is not active"));
-
-    if (loiterChanged) {
-        emit loiterCoordinateChanged();
-    }
-    if (landingChanged) {
-        emit landingCoordinateChanged();
-    }
-    if (loiterAltitudeChangedValue) {
-        emit loiterAltitudeChanged();
-    }
-    if (landingAltitudeChangedValue) {
-        emit landingAltitudeChanged();
-    }
-    if (radiusChanged) {
-        emit loiterRadiusChanged();
-    }
-    if (airspeedChanged) {
-        emit approachAirspeedChanged();
-    }
-    if (clockwiseChangedValue) {
-        emit clockwiseChanged();
-    }
-    emit canExecuteChanged();
 }
 
 void CustomLandingController::_activeVehicleChanged(Vehicle* activeVehicle)
@@ -546,6 +730,8 @@ void CustomLandingController::_updateModeActive()
         _setPlanCommitted(false);
         _commitUncertain = false;
         _applyPendingTangentDistance();
+        _clearDraft();
+        _setErrorText(QString());
         _setStateText(tr("Custom Landing mode is not active"));
     } else {
         _setPlanCommitted(false);
@@ -634,12 +820,173 @@ void CustomLandingController::_setPlanIdentity(quint32 planId, quint16 crc)
     }
 }
 
+void CustomLandingController::_clearDraft()
+{
+    const bool loiterChanged = _loiterCoordinate.isValid();
+    const bool landingChanged = _landingCoordinate.isValid();
+    const double defaultLandingElevation = std::isfinite(_currentRtkAltitude)
+        ? _currentRtkAltitude
+        : (std::isfinite(_homeAltitude) ? _homeAltitude
+                                       : std::numeric_limits<double>::quiet_NaN());
+    const double defaultLandingAltitude = std::isfinite(_homeAltitude) &&
+                                                  std::isfinite(defaultLandingElevation)
+        ? defaultLandingElevation - _homeAltitude
+        : 0.0;
+    const double defaultLoiterAltitude = defaultLandingAltitude + 50.0;
+    const bool loiterAltitudeChangedValue = !fuzzyEqual(_loiterAltitude, defaultLoiterAltitude);
+    const bool landingAltitudeChangedValue = !fuzzyEqual(_landingAltitude, defaultLandingAltitude);
+    const bool landingElevationChangedValue = !fuzzyEqual(_landingElevation, defaultLandingElevation);
+    const bool loiterHeightChangedValue = !fuzzyEqual(_loiterHeightAboveLanding, 50.0);
+    const bool radiusChanged = !fuzzyEqual(_loiterRadius, _minimumLoiterRadius);
+    const bool airspeedChanged = !std::isnan(_approachAirspeed);
+    const bool clockwiseChangedValue = !_clockwise;
+
+    _loiterCoordinate = QGeoCoordinate();
+    _landingCoordinate = QGeoCoordinate();
+    _loiterAltitude = defaultLoiterAltitude;
+    _landingAltitude = defaultLandingAltitude;
+    _landingElevation = defaultLandingElevation;
+    _loiterHeightAboveLanding = 50.0;
+    _loiterRadius = _minimumLoiterRadius;
+    _approachAirspeed = std::numeric_limits<double>::quiet_NaN();
+    _clockwise = true;
+    _pendingPlan = PlanSnapshot{};
+    _cancelAction = 0;
+    _setPlanIdentity(0, 0);
+
+    if (loiterChanged) {
+        emit loiterCoordinateChanged();
+    }
+    if (landingChanged) {
+        emit landingCoordinateChanged();
+    }
+    if (loiterAltitudeChangedValue) {
+        emit loiterAltitudeChanged();
+    }
+    if (landingAltitudeChangedValue) {
+        emit landingAltitudeChanged();
+    }
+    if (landingElevationChangedValue) {
+        emit landingElevationChanged();
+    }
+    if (loiterHeightChangedValue) {
+        emit loiterHeightAboveLandingChanged();
+    }
+    if (radiusChanged) {
+        emit loiterRadiusChanged();
+    }
+    if (airspeedChanged) {
+        emit approachAirspeedChanged();
+    }
+    if (clockwiseChangedValue) {
+        emit clockwiseChanged();
+    }
+    emit canExecuteChanged();
+}
+
 void CustomLandingController::_draftChanged()
 {
     _setPlanIdentity(0, 0);
     _setErrorText(QString());
     _setStateText(_modeActive ? tr("Custom Landing draft changed") : tr("Custom Landing mode is not active"));
     emit canExecuteChanged();
+}
+
+void CustomLandingController::_homePositionChanged()
+{
+    const double previousHomeAltitude = _homeAltitude;
+    double newHomeAltitude = std::numeric_limits<double>::quiet_NaN();
+    if (_vehicle) {
+        const QGeoCoordinate home = _vehicle->homePosition();
+        if (home.isValid() && std::isfinite(home.altitude())) {
+            newHomeAltitude = home.altitude();
+        }
+    }
+
+    if (fuzzyEqual(previousHomeAltitude, newHomeAltitude)) {
+        return;
+    }
+
+    _homeAltitude = newHomeAltitude;
+    emit homeAltitudeChanged();
+
+    if (!std::isfinite(_landingElevation) && std::isfinite(_homeAltitude)) {
+        // Home is only the fallback when the ground-station altitude is not
+        // available. Once position data arrives, the editable draft follows
+        // the ground-station altitude automatically.
+        _landingElevation = std::isfinite(_currentRtkAltitude)
+            ? _currentRtkAltitude
+            : _homeAltitude + _landingAltitude;
+        emit landingElevationChanged();
+    }
+
+    if (!_busy && !_planCommitted && !_commitUncertain) {
+        const bool existingHomeWasRebased = std::isfinite(previousHomeAltitude) &&
+                                            std::isfinite(_landingElevation);
+        _syncProtocolAltitudesFromDisplay(existingHomeWasRebased);
+    } else {
+        emit canExecuteChanged();
+    }
+}
+
+void CustomLandingController::_gcsPositionInfoUpdated(const QGeoPositionInfo& positionInfo)
+{
+    const bool wasAvailable = rtkAltitudeAvailable();
+    const QGeoCoordinate coordinate = positionInfo.coordinate();
+    const double altitude = positionInfo.isValid() && coordinate.isValid() &&
+                                    std::isfinite(coordinate.altitude())
+        ? coordinate.altitude()
+        : std::numeric_limits<double>::quiet_NaN();
+    if (fuzzyEqual(altitude, _currentRtkAltitude)) {
+        return;
+    }
+
+    _currentRtkAltitude = altitude;
+    emit currentRtkAltitudeChanged();
+    if (wasAvailable != rtkAltitudeAvailable()) {
+        emit rtkAltitudeAvailableChanged();
+    }
+
+}
+
+void CustomLandingController::_syncProtocolAltitudesFromDisplay(bool markDraftChanged)
+{
+    if (std::isfinite(_homeAltitude) && std::isfinite(_landingElevation) &&
+        std::isfinite(_loiterHeightAboveLanding)) {
+        const double landingAltitude = _landingElevation - _homeAltitude;
+        const double loiterAltitude = landingAltitude + _loiterHeightAboveLanding;
+
+        if (!fuzzyEqual(landingAltitude, _landingAltitude)) {
+            _landingAltitude = landingAltitude;
+            emit landingAltitudeChanged();
+        }
+        if (!fuzzyEqual(loiterAltitude, _loiterAltitude)) {
+            _loiterAltitude = loiterAltitude;
+            emit loiterAltitudeChanged();
+        }
+    }
+
+    if (markDraftChanged) {
+        _draftChanged();
+    } else {
+        emit canExecuteChanged();
+    }
+}
+
+bool CustomLandingController::readCurrentRtkAltitude()
+{
+    if (_busy || _planCommitted || _commitUncertain) {
+        _setErrorText(tr("The landing elevation cannot be changed while the plan is active"));
+        return false;
+    }
+    if (!rtkAltitudeAvailable()) {
+        _setErrorText(tr("Current RTK altitude is unavailable"));
+        return false;
+    }
+
+    _setErrorText(QString());
+    setLandingElevation(_currentRtkAltitude);
+    return true;
 }
 
 bool CustomLandingController::_validateDraft(QString& error) const
@@ -677,17 +1024,26 @@ bool CustomLandingController::_validateDraft(QString& error) const
         error = tr("Latitude and longitude cannot both be zero");
         return false;
     }
-    if (!std::isfinite(_loiterAltitude) || (_loiterAltitude <= 0.0) ||
+    if (!std::isfinite(_homeAltitude)) {
+        error = tr("Vehicle Home altitude is unavailable");
+        return false;
+    }
+    if (!std::isfinite(_landingElevation) || !std::isfinite(_loiterHeightAboveLanding)) {
+        error = tr("Landing elevation or loiter height is invalid");
+        return false;
+    }
+    if (!std::isfinite(_loiterAltitude) ||
         !std::isfinite(_landingAltitude) || !std::isfinite(_loiterRadius) ||
-        (_loiterRadius < 10.0) || (_loiterRadius > 10000.0) ||
+        (_loiterRadius < _minimumLoiterRadius) || (_loiterRadius > kMaximumLoiterRadius) ||
         !std::isfinite(_tangentDistance) ||
         (_tangentDistance < kMinimumTangentDistance) ||
         (_tangentDistance > kMaximumTangentDistance)) {
         error = tr("Altitude, loiter radius, or CLND_TAN_DIST is invalid");
         return false;
     }
-    if ((_loiterAltitude - _landingAltitude) < 20.0) {
-        error = tr("Loiter altitude must be at least 20 metres above landing altitude");
+    if (_loiterHeightAboveLanding < 20.0 ||
+        !fuzzyEqual(_loiterAltitude - _landingAltitude, _loiterHeightAboveLanding)) {
+        error = tr("Loiter height must be at least 20 metres above the landing point");
         return false;
     }
     constexpr double maxCanonicalValue = static_cast<double>(std::numeric_limits<qint32>::max()) / 100.0;
@@ -943,7 +1299,7 @@ void CustomLandingController::_handleCommandResult(Operation operation, quint64 
     case Operation::Cancel:
         _commitUncertain = false;
         _setPlanCommitted(false);
-        _setPlanIdentity(0, 0);
+        _clearDraft();
         _setErrorText(QString());
         _setStateText(tr("Custom Landing plan cancelled; vehicle holding"));
         _finishOperation();

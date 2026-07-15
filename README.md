@@ -51,6 +51,9 @@ QGroundControl is *open-source*, meaning you have the power to shape it! Whether
 - 🤝 [Contributing](https://dev.qgroundcontrol.com/en/contribute/)
 - 📜 [License Information](https://github.com/mavlink/qgroundcontrol/blob/master/.github/COPYING.md)
 
+### Build Scripts
+
+> .\tools\build-qgc-windows.ps1
 ---
 
 With QGroundControl, you're in full command of your UAV, ready to take your missions to the next level.

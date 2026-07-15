@@ -19628,6 +19628,10 @@ ROTATION_NONE 表示组件指向飞行方向。</translation>
     </message>  </context>
   <context>
     <name>CustomLandingMapVisual</name>
+
+    <message><source>m AMSL</source><translation>米（海拔）</translation></message>
+    <message><source>Not set</source><translation>未设置</translation></message>
+    <message><source>Deceleration zone</source><translation>减速区</translation></message>
     <message>
       <location filename="../src/FlightDisplay/CustomLandingMapVisual.qml" line="41"/>
       <source>Loiter descent point must remain on the fixed CLND_TAN_DIST constraint.</source>
@@ -19657,6 +19661,14 @@ ROTATION_NONE 表示组件指向飞行方向。</translation>
   </context>
   <context>
     <name>CustomLandingPanel</name>
+
+    <message><source>Landing elevation AMSL</source><translation>海拔高度</translation></message>
+    <message><source>Altitude relative to Home</source><translation>相对 Home 高度</translation></message>
+    <message><source>Sync altitude</source><translation>同步高度</translation></message>
+    <message><source>Read current RTK altitude</source><translation> 同步地面站高度</translation></message>
+    <message><source>Home: %1 m</source><translation>Home：%1 米</translation></message>
+    <message><source>Loiter height above landing</source><translation>滑降盘旋相对高度</translation></message>
+    <message><source>Landing elevation and loiter height are converted to Home-relative altitudes when uploaded.</source><translation>上传时会将降落海拔和滑降盘旋相对高度自动换算为相对 Home 高度。</translation></message>
     <message>
       <location filename="../src/FlightDisplay/CustomLandingPanel.qml" line="42"/>
       <source>Waiting for the custom landing controller.</source>
@@ -19909,6 +19921,12 @@ ROTATION_NONE 表示组件指向飞行方向。</translation>
   </context>
   <context>
     <name>CustomLandingController</name>
+
+    <message><source>The landing elevation cannot be changed while the plan is active</source><translation>方案生效期间不能修改降落海拔</translation></message>
+    <message><source>Current RTK altitude is unavailable</source><translation>当前 RTK 高度不可用</translation></message>
+    <message><source>Vehicle Home altitude is unavailable</source><translation>飞控 Home 海拔不可用</translation></message>
+    <message><source>Landing elevation or loiter height is invalid</source><translation>降落海拔或滑降盘旋相对高度无效</translation></message>
+    <message><source>Loiter height must be at least 20 metres above the landing point</source><translation>滑降盘旋高度必须至少比降落点高 20 米</translation></message>
     <message>
       <location filename="../src/QmlControls/CustomLandingController.cc" line="118"/>
       <source>Query Custom Landing capability</source>
