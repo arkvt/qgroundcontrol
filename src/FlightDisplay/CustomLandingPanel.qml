@@ -61,15 +61,15 @@ Rectangle {
     }
 
     property var _confirmationDialog
-    property real _margin: Math.max(8, ScreenTools.defaultFontPixelWidth * 0.8)
+    property real _margin: Math.max(7, ScreenTools.defaultFontPixelWidth * 0.6)
 
-    width: Math.max(330, ScreenTools.defaultFontPixelWidth * 36)
+    width: Math.max(300, ScreenTools.defaultFontPixelWidth * 31)
     height: Math.min(contentColumn.implicitHeight + (_margin * 2),
                      Math.max(ScreenTools.minTouchPixels * 5, maximumHeight))
     radius: Math.round(ScreenTools.defaultFontPixelWidth * 0.8)
     color: "transparent"
     border.width: 1
-    border.color: Qt.rgba(1, 1, 1, 0.22)
+    border.color: Qt.rgba(0.82, 0.88, 0.94, 0.12)
     clip: true
 
     QGCPalette {
@@ -83,12 +83,13 @@ Rectangle {
         backdropBlurEnabled: true
         targetItem: _root
         cornerRadius: _root.radius
-    }
-
-    Rectangle {
-        anchors.fill: parent
-        radius: parent.radius
-        color: Qt.rgba(0.035, 0.055, 0.075, 0.9)
+        sourceScale: 0.46
+        blurAmount: 0.94
+        blurMax: 42
+        sourceBrightness: -0.01
+        sourceSaturation: 0.62
+        tintColor: Qt.rgba(0.045, 0.048, 0.052, 0.78)
+        sheenColor: "transparent"
     }
 
     // The panel itself must consume clicks, while the rest of the custom layer
@@ -175,7 +176,8 @@ Rectangle {
         }
 
         QGCTextField {
-            Layout.preferredWidth: ScreenTools.defaultFontPixelWidth * 9
+            Layout.preferredWidth: ScreenTools.defaultFontPixelWidth * 10.5
+            Layout.minimumWidth: Layout.preferredWidth
             horizontalAlignment: TextInput.AlignRight
             text: numericRow.formattedValue()
             placeholderText: numericRow.allowUnset ? qsTr("Default") : ""
@@ -202,6 +204,37 @@ Rectangle {
         }
     }
 
+    component PointBadge: Rectangle {
+        property int pointIndex: 1
+        property bool selected: false
+
+        implicitWidth: Math.max(ScreenTools.defaultFontPixelHeight * 1.45, ScreenTools.minTouchPixels * 0.62)
+        implicitHeight: implicitWidth
+        radius: width / 2
+        color: selected ? qgcPal.mapMissionTrajectory : Qt.rgba(1, 1, 1, 0.10)
+        border.width: 1
+        border.color: selected ? Qt.rgba(1, 1, 1, 0.65) : Qt.rgba(1, 1, 1, 0.18)
+
+        Rectangle {
+            anchors.fill: parent
+            anchors.margins: -3
+            radius: width / 2
+            color: "transparent"
+            border.width: 1
+            border.color: Qt.rgba(1, 1, 1, 0.55)
+            visible: parent.selected
+        }
+
+        QGCLabel {
+            anchors.fill: parent
+            text: parent.pointIndex
+            color: "white"
+            font.bold: true
+            horizontalAlignment: Text.AlignHCenter
+            verticalAlignment: Text.AlignVCenter
+        }
+    }
+
     Flickable {
         id: panelFlickable
         anchors.fill: parent
@@ -215,7 +248,7 @@ Rectangle {
         ColumnLayout {
             id: contentColumn
             width: panelFlickable.width
-            spacing: ScreenTools.defaultFontPixelHeight * 0.45
+            spacing: ScreenTools.defaultFontPixelHeight * 0.36
 
             RowLayout {
                 Layout.fillWidth: true
@@ -225,7 +258,7 @@ Rectangle {
                     Layout.fillWidth: true
                     text: qsTr("Custom Landing")
                     font.bold: true
-                    font.pointSize: ScreenTools.largeFontPointSize
+                    font.pointSize: ScreenTools.titleFontPointSize
                     color: "white"
                 }
 
@@ -244,31 +277,25 @@ Rectangle {
                 color: "white"
             }
 
-            QGCLabel {
+            RowLayout {
                 Layout.fillWidth: true
-                text: qsTr("Altitudes are relative to the home position.")
-                wrapMode: Text.WordWrap
-                color: Qt.rgba(1, 1, 1, 0.72)
-            }
+                spacing: ScreenTools.defaultFontPixelWidth * 0.45
 
-            Rectangle {
-                Layout.fillWidth: true
-                Layout.preferredHeight: stateLabel.implicitHeight + ScreenTools.defaultFontPixelHeight * 0.45
-                radius: ScreenTools.defaultFontPixelWidth * 0.4
-                color: controller && controller.planCommitted
-                           ? Qt.rgba(0.1, 0.55, 0.24, 0.35)
-                           : Qt.rgba(1, 1, 1, 0.08)
+                Rectangle {
+                    Layout.preferredWidth: ScreenTools.defaultFontPixelWidth * 0.65
+                    Layout.preferredHeight: width
+                    radius: width / 2
+                    color: controller && controller.planCommitted ? qgcPal.colorGreen : qgcPal.mapIndicator
+                }
 
                 QGCLabel {
-                    id: stateLabel
-                    anchors.fill: parent
-                    anchors.margins: ScreenTools.defaultFontPixelWidth * 0.45
+                    Layout.fillWidth: true
                     text: controller && controller.stateText.length > 0
                               ? controller.stateText
                               : qsTr("Draft not committed")
-                    wrapMode: Text.WordWrap
-                    color: "white"
-                    font.bold: true
+                    elide: Text.ElideRight
+                    color: Qt.rgba(1, 1, 1, 0.72)
+                    font.pointSize: ScreenTools.smallFontPointSize
                 }
             }
 
@@ -305,90 +332,172 @@ Rectangle {
                 font.bold: true
             }
 
+            Rectangle {
+                Layout.fillWidth: true
+                Layout.preferredHeight: landingCardColumn.implicitHeight + (_root._margin * 1.5)
+                radius: ScreenTools.defaultFontPixelWidth * 0.5
+                color: Qt.rgba(1, 1, 1, 0.055)
+                border.width: !_root.landingCoordinateValid ? 2 : 1
+                border.color: !_root.landingCoordinateValid
+                                  ? qgcPal.mapMissionTrajectory
+                                  : Qt.rgba(0.82, 0.88, 0.94, 0.12)
+
+                ColumnLayout {
+                    id: landingCardColumn
+                    anchors.fill: parent
+                    anchors.margins: _root._margin * 0.75
+                    spacing: ScreenTools.defaultFontPixelHeight * 0.25
+
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: ScreenTools.defaultFontPixelWidth * 0.6
+
+                        PointBadge {
+                            pointIndex: 1
+                            selected: !_root.landingCoordinateValid
+                        }
+
+                        ColumnLayout {
+                            Layout.fillWidth: true
+                            spacing: 0
+
+                            QGCLabel {
+                                Layout.fillWidth: true
+                                text: qsTr("Vertical landing point")
+                                font.bold: true
+                                color: qgcPal.text
+                            }
+
+                            QGCLabel {
+                                Layout.fillWidth: true
+                                text: _root._coordinateText(controller ? controller.landingCoordinate : undefined)
+                                elide: Text.ElideRight
+                                color: Qt.rgba(1, 1, 1, 0.62)
+                                font.pointSize: ScreenTools.smallFontPointSize
+                            }
+                        }
+
+                        QGCButton {
+                            text: qsTr("Sync altitude")
+                            enabled: _root.draftEditable && controller && controller.rtkAltitudeAvailable
+                            onClicked: controller.readCurrentRtkAltitude()
+                        }
+                    }
+
+                    NumericFieldRow {
+                        label: qsTr("Landing elevation AMSL")
+                        value: controller ? controller.landingElevation : NaN
+                        units: qsTr("m")
+                        minimumValue: -1000
+                        maximumValue: 10000
+                        editable: _root.draftEditable
+                        onValueEdited: (newValue) => controller.landingElevation = newValue
+                    }
+
+                    NumericFieldRow {
+                        label: qsTr("Altitude relative to Home")
+                        value: controller ? controller.landingAltitude : NaN
+                        units: qsTr("m")
+                        minimumValue: -1000
+                        maximumValue: 10000
+                        editable: _root.draftEditable
+                        onValueEdited: (newValue) => controller.landingAltitude = newValue
+                    }
+                }
+            }
+
+            Rectangle {
+                Layout.fillWidth: true
+                Layout.preferredHeight: loiterCardColumn.implicitHeight + (_root._margin * 1.5)
+                radius: ScreenTools.defaultFontPixelWidth * 0.5
+                color: Qt.rgba(1, 1, 1, 0.055)
+                border.width: _root.landingCoordinateValid && !_root.loiterCoordinateValid ? 2 : 1
+                border.color: _root.landingCoordinateValid && !_root.loiterCoordinateValid
+                                  ? qgcPal.mapMissionTrajectory
+                                  : Qt.rgba(0.82, 0.88, 0.94, 0.12)
+
+                ColumnLayout {
+                    id: loiterCardColumn
+                    anchors.fill: parent
+                    anchors.margins: _root._margin * 0.75
+                    spacing: ScreenTools.defaultFontPixelHeight * 0.25
+
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: ScreenTools.defaultFontPixelWidth * 0.6
+
+                        PointBadge {
+                            pointIndex: 2
+                            selected: _root.landingCoordinateValid && !_root.loiterCoordinateValid
+                        }
+
+                        ColumnLayout {
+                            Layout.fillWidth: true
+                            spacing: 0
+
+                            QGCLabel {
+                                Layout.fillWidth: true
+                                text: qsTr("Loiter descent point")
+                                font.bold: true
+                                color: qgcPal.text
+                            }
+
+                            QGCLabel {
+                                Layout.fillWidth: true
+                                text: _root._coordinateText(controller ? controller.loiterCoordinate : undefined)
+                                elide: Text.ElideRight
+                                color: Qt.rgba(1, 1, 1, 0.62)
+                                font.pointSize: ScreenTools.smallFontPointSize
+                            }
+                        }
+                    }
+
+                    NumericFieldRow {
+                        label: qsTr("Loiter height above landing")
+                        value: controller ? controller.loiterHeightAboveLanding : 50
+                        units: qsTr("m")
+                        minimumValue: 20
+                        maximumValue: 10000
+                        editable: _root.draftEditable
+                        onValueEdited: (newValue) => controller.loiterHeightAboveLanding = newValue
+                    }
+
+                    NumericFieldRow {
+                        label: qsTr("Loiter radius")
+                        value: controller ? controller.loiterRadius : 100
+                        units: qsTr("m")
+                        minimumValue: controller ? controller.minimumLoiterRadius : 100
+                        maximumValue: 10000
+                        editable: _root.draftEditable
+                        onValueEdited: (newValue) => controller.loiterRadius = newValue
+                    }
+
+                    RowLayout {
+                        Layout.fillWidth: true
+
+                        QGCLabel {
+                            Layout.fillWidth: true
+                            text: qsTr("Loiter direction")
+                            color: qgcPal.text
+                        }
+
+                        QGCSwitch {
+                            text: checked ? qsTr("Clockwise") : qsTr("Counter-clockwise")
+                            checked: controller ? controller.clockwise : true
+                            enabled: _root.draftEditable
+                            onToggled: controller.clockwise = checked
+                        }
+                    }
+                }
+            }
+
             SectionDivider { }
 
-            QGCLabel {
-                Layout.fillWidth: true
-                text: qsTr("Loiter descent point")
-                font.bold: true
-                color: "#f4b942"
-            }
-
-            QGCLabel {
-                Layout.fillWidth: true
-                text: _root._coordinateText(controller ? controller.loiterCoordinate : undefined)
-                elide: Text.ElideRight
-                color: "white"
-            }
-
             NumericFieldRow {
-                label: qsTr("Target altitude")
-                value: controller ? controller.loiterAltitude : 50
-                units: qsTr("m")
-                minimumValue: controller ? Number(controller.landingAltitude) + 20 : 20
-                maximumValue: 10000
-                editable: _root.draftEditable
-                onValueEdited: (newValue) => controller.loiterAltitude = newValue
-            }
-
-            NumericFieldRow {
-                label: qsTr("Loiter radius")
-                value: controller ? controller.loiterRadius : 100
-                units: qsTr("m")
-                minimumValue: 10
-                maximumValue: 10000
-                editable: _root.draftEditable
-                onValueEdited: (newValue) => controller.loiterRadius = newValue
-            }
-
-            NumericFieldRow {
-                label: qsTr("Tangent distance (CLND_TAN_DIST)")
+                label: qsTr("Tangent distance")
                 value: controller ? controller.tangentDistance : 300
                 units: qsTr("m")
                 editable: false
-            }
-
-            RowLayout {
-                Layout.fillWidth: true
-
-                QGCLabel {
-                    Layout.fillWidth: true
-                    text: qsTr("Loiter direction")
-                    color: "white"
-                }
-
-                QGCSwitch {
-                    text: checked ? qsTr("Clockwise") : qsTr("Counter-clockwise")
-                    checked: controller ? controller.clockwise : true
-                    enabled: _root.draftEditable
-                    onToggled: controller.clockwise = checked
-                }
-            }
-
-            SectionDivider { }
-
-            QGCLabel {
-                Layout.fillWidth: true
-                text: qsTr("Vertical landing point")
-                font.bold: true
-                color: "#4bc0ff"
-            }
-
-            QGCLabel {
-                Layout.fillWidth: true
-                text: _root._coordinateText(controller ? controller.landingCoordinate : undefined)
-                elide: Text.ElideRight
-                color: "white"
-            }
-
-            NumericFieldRow {
-                label: qsTr("Landing altitude")
-                value: controller ? controller.landingAltitude : 0
-                units: qsTr("m")
-                minimumValue: -1000
-                maximumValue: controller ? Math.min(10000, Number(controller.loiterAltitude) - 20) : 30
-                editable: _root.draftEditable
-                onValueEdited: (newValue) => controller.landingAltitude = newValue
             }
 
             NumericFieldRow {
@@ -400,6 +509,14 @@ Rectangle {
                 editable: _root.draftEditable
                 allowUnset: true
                 onValueEdited: (newValue) => controller.approachAirspeed = newValue
+            }
+
+            QGCLabel {
+                Layout.fillWidth: true
+                text: qsTr("Landing elevation and loiter height are converted to Home-relative altitudes when uploaded.")
+                wrapMode: Text.WordWrap
+                color: Qt.rgba(1, 1, 1, 0.58)
+                font.pointSize: ScreenTools.smallFontPointSize
             }
 
             SectionDivider { }
@@ -464,8 +581,8 @@ Rectangle {
 
                     QGCLabel { text: qsTr("Loiter point") }
                     QGCLabel { text: _root._coordinateText(_root.controller.loiterCoordinate) }
-                    QGCLabel { text: qsTr("Loiter altitude") }
-                    QGCLabel { text: qsTr("%1 m").arg(_root._numberText(_root.controller.loiterAltitude, 1)) }
+                    QGCLabel { text: qsTr("Loiter height above landing") }
+                    QGCLabel { text: qsTr("%1 m").arg(_root._numberText(_root.controller.loiterHeightAboveLanding, 1)) }
                     QGCLabel { text: qsTr("Radius / direction") }
                     QGCLabel {
                         text: qsTr("%1 m, %2").arg(_root._numberText(_root.controller.loiterRadius, 1))
@@ -476,8 +593,8 @@ Rectangle {
                     QGCLabel { text: qsTr("%1 m").arg(_root._numberText(_root.controller.tangentDistance, 1)) }
                     QGCLabel { text: qsTr("Landing point") }
                     QGCLabel { text: _root._coordinateText(_root.controller.landingCoordinate) }
-                    QGCLabel { text: qsTr("Landing altitude") }
-                    QGCLabel { text: qsTr("%1 m").arg(_root._numberText(_root.controller.landingAltitude, 1)) }
+                    QGCLabel { text: qsTr("Landing elevation AMSL") }
+                    QGCLabel { text: qsTr("%1 m").arg(_root._numberText(_root.controller.landingElevation, 1)) }
                     QGCLabel { text: qsTr("Approach airspeed") }
                     QGCLabel {
                         text: isFinite(Number(_root.controller.approachAirspeed))

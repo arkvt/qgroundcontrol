@@ -174,8 +174,21 @@ void FollowMe::_sendGCSMotionReport()
     for (int i = 0; i < vehicles->count(); i++) {
         Vehicle* const vehicle = vehicles->value<Vehicle*>(i);
         if ((_currentMode == MODE_ALWAYS) || (_isFollowFlightMode(vehicle, vehicle->flightMode()))) {
-            qCDebug(FollowMeLog) << "sendGCSMotionReport latInt:lonInt:altMetersAMSL" << motionReport.lat_int << motionReport.lon_int << motionReport.altMetersAMSL;
-            vehicle->firmwarePlugin()->sendGCSMotionReport(vehicle, motionReport, estimationCapabilities);
+            GCSMotionReport vehicleMotionReport = motionReport;
+            if (!qIsFinite(vehicleMotionReport.altMetersAMSL)) {
+                const QGeoCoordinate homePosition = vehicle->homePosition();
+                if (!homePosition.isValid() || !qIsFinite(homePosition.altitude())) {
+                    qCWarning(FollowMeLog) << "Skipping GCS motion report without a finite AMSL altitude for vehicle" << vehicle->id();
+                    continue;
+                }
+                vehicleMotionReport.altMetersAMSL = homePosition.altitude();
+            }
+
+            qCDebug(FollowMeLog) << "sendGCSMotionReport latInt:lonInt:altMetersAMSL"
+                                 << vehicleMotionReport.lat_int
+                                 << vehicleMotionReport.lon_int
+                                 << vehicleMotionReport.altMetersAMSL;
+            vehicle->firmwarePlugin()->sendGCSMotionReport(vehicle, vehicleMotionReport, estimationCapabilities);
         }
     }
 }

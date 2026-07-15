@@ -71,6 +71,19 @@
 
 QGC_LOGGING_CATEGORY(VehicleLog, "VehicleLog")
 
+struct Vehicle::FlightCheckCommandAckContext : QObject
+{
+    FlightCheckCommandAckContext(Vehicle* vehicle_, quint64 requestId_)
+        : QObject(vehicle_)
+        , vehicle(vehicle_)
+        , requestId(requestId_)
+    {
+    }
+
+    Vehicle* vehicle = nullptr;
+    quint64 requestId = 0;
+};
+
 #define UPDATE_TIMER 50
 #define DEFAULT_LAT  38.965767f
 #define DEFAULT_LON -120.083923f
@@ -266,6 +279,16 @@ void Vehicle::_commonInit()
 
     connect(this, &Vehicle::vehicleTypeChanged,     this, &Vehicle::inFwdFlightChanged);
     connect(this, &Vehicle::vtolInFwdFlightChanged, this, &Vehicle::inFwdFlightChanged);
+
+    _flightCheckCommandTimeoutTimer.setSingleShot(true);
+    connect(&_flightCheckCommandTimeoutTimer, &QTimer::timeout, this, [this]() {
+        if (_flightCheckCommandPending) {
+            const int testId = _flightCheckPendingTestId;
+            _flightCheckPendingTestId = -1;
+            _flightCheckCommandPending = false;
+            emit flightCheckActuatorTestCommandFinished(testId, false);
+        }
+    });
 
     connect(QGCPositionManager::instance(), &QGCPositionManager::gcsPositionChanged, this, &Vehicle::_updateDistanceToGCS);
     connect(QGCPositionManager::instance(), &QGCPositionManager::gcsPositionChanged, this, &Vehicle::_updateHomepoint);
@@ -3219,9 +3242,70 @@ void Vehicle::motorTest(int motor, int percent, int timeoutSecs, bool showError)
     sendMavCommand(_defaultComponentId, MAV_CMD_DO_MOTOR_TEST, showError, motor, MOTOR_TEST_THROTTLE_PERCENT, percent, timeoutSecs, 0, MOTOR_TEST_ORDER_BOARD);
 }
 
-void Vehicle::sendFlightCheckControl(float roll, float pitch, float yaw, float thrust)
+bool Vehicle::startFlightCheckActuatorTest(int testId)
 {
-    sendJoystickDataThreadSafe(roll, pitch, yaw, thrust, 0);
+    static constexpr int kFirstActionCode = 53;
+    static constexpr int kLastActionCode = 58;
+    static constexpr int kFirstMotor = 0;
+    static constexpr int kLastMotor = 4;
+
+    const bool controlSurfaceTest = testId >= kFirstActionCode && testId <= kLastActionCode;
+    const bool motorTest = testId >= kFirstMotor && testId <= kLastMotor;
+
+    if ((!controlSurfaceTest && !motorTest) || _flightCheckCommandPending) {
+        return false;
+    }
+
+    ++_flightCheckRequestId;
+    _flightCheckPendingTestId = testId;
+    _flightCheckCommandPending = true;
+    _flightCheckCommandTimeoutTimer.start(_flightCheckCommandTimeoutMsecs);
+
+    auto* context = new FlightCheckCommandAckContext(this, _flightCheckRequestId);
+    const MavCmdAckHandlerInfo_t handlerInfo = {
+        /* .resultHandler = */ &Vehicle::_flightCheckCommandResultHandler,
+        /* .resultHandlerData = */ context,
+        /* .progressHandler = */ nullptr,
+        /* .progressHandlerData = */ nullptr,
+    };
+
+    if (controlSurfaceTest) {
+        sendMavCommandWithHandler(&handlerInfo, _defaultComponentId, MAV_CMD_DO_MOTOR_TEST, 0, testId, 50, 2);
+    } else {
+        sendMavCommandWithHandler(&handlerInfo, _defaultComponentId, MAV_CMD_DO_MOTOR_TEST, testId, MOTOR_TEST_THROTTLE_PERCENT, 10, 2, 0, MOTOR_TEST_ORDER_BOARD);
+    }
+
+    return true;
+}
+
+void Vehicle::_flightCheckCommandResultHandler(void* resultHandlerData, int /*compId*/, const mavlink_command_ack_t& ack, MavCmdResultFailureCode_t failureCode)
+{
+    auto* context = static_cast<FlightCheckCommandAckContext*>(resultHandlerData);
+    if (!context) {
+        return;
+    }
+
+    Vehicle* vehicle = context->vehicle;
+    const quint64 requestId = context->requestId;
+    const bool accepted = failureCode == MavCmdResultCommandResultOnly && ack.result == MAV_RESULT_ACCEPTED;
+    delete context;
+
+    if (vehicle) {
+        vehicle->_finishFlightCheckCommand(requestId, accepted);
+    }
+}
+
+void Vehicle::_finishFlightCheckCommand(quint64 requestId, bool accepted)
+{
+    if (!_flightCheckCommandPending || requestId != _flightCheckRequestId) {
+        return;
+    }
+
+    const int testId = _flightCheckPendingTestId;
+    _flightCheckPendingTestId = -1;
+    _flightCheckCommandTimeoutTimer.stop();
+    _flightCheckCommandPending = false;
+    emit flightCheckActuatorTestCommandFinished(testId, accepted);
 }
 
 QString Vehicle::brandImageIndoor() const

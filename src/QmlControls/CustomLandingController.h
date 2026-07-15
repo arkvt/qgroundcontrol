@@ -12,7 +12,9 @@
 #include <QtCore/QObject>
 #include <QtCore/QPointer>
 #include <QtPositioning/QGeoCoordinate>
+#include <QtPositioning/QGeoPositionInfo>
 
+#include <cmath>
 #include <limits>
 
 class Vehicle;
@@ -37,7 +39,14 @@ class CustomLandingController : public QObject
     Q_PROPERTY(QGeoCoordinate landingCoordinate READ landingCoordinate WRITE setLandingCoordinate NOTIFY landingCoordinateChanged)
     Q_PROPERTY(double loiterAltitude READ loiterAltitude WRITE setLoiterAltitude NOTIFY loiterAltitudeChanged)
     Q_PROPERTY(double landingAltitude READ landingAltitude WRITE setLandingAltitude NOTIFY landingAltitudeChanged)
+    Q_PROPERTY(double landingElevation READ landingElevation WRITE setLandingElevation NOTIFY landingElevationChanged)
+    Q_PROPERTY(double loiterHeightAboveLanding READ loiterHeightAboveLanding WRITE setLoiterHeightAboveLanding NOTIFY loiterHeightAboveLandingChanged)
+    Q_PROPERTY(double homeAltitude READ homeAltitude NOTIFY homeAltitudeChanged)
+    Q_PROPERTY(double currentRtkAltitude READ currentRtkAltitude NOTIFY currentRtkAltitudeChanged)
+    Q_PROPERTY(bool rtkAltitudeAvailable READ rtkAltitudeAvailable NOTIFY rtkAltitudeAvailableChanged)
     Q_PROPERTY(double loiterRadius READ loiterRadius WRITE setLoiterRadius NOTIFY loiterRadiusChanged)
+    Q_PROPERTY(double minimumLoiterRadius READ minimumLoiterRadius NOTIFY minimumLoiterRadiusChanged)
+    Q_PROPERTY(double airbrakeRadius READ airbrakeRadius NOTIFY airbrakeRadiusChanged)
     Q_PROPERTY(double tangentDistance READ tangentDistance NOTIFY tangentDistanceChanged)
     Q_PROPERTY(double approachAirspeed READ approachAirspeed WRITE setApproachAirspeed NOTIFY approachAirspeedChanged)
     Q_PROPERTY(bool clockwise READ clockwise WRITE setClockwise NOTIFY clockwiseChanged)
@@ -80,8 +89,17 @@ public:
     void setLoiterAltitude(double altitude);
     double landingAltitude() const { return _landingAltitude; }
     void setLandingAltitude(double altitude);
+    double landingElevation() const { return _landingElevation; }
+    void setLandingElevation(double elevation);
+    double loiterHeightAboveLanding() const { return _loiterHeightAboveLanding; }
+    void setLoiterHeightAboveLanding(double height);
+    double homeAltitude() const { return _homeAltitude; }
+    double currentRtkAltitude() const { return _currentRtkAltitude; }
+    bool rtkAltitudeAvailable() const { return std::isfinite(_currentRtkAltitude); }
     double loiterRadius() const { return _loiterRadius; }
     void setLoiterRadius(double radius);
+    double minimumLoiterRadius() const { return _minimumLoiterRadius; }
+    double airbrakeRadius() const;
     double tangentDistance() const { return _tangentDistance; }
     double approachAirspeed() const { return _approachAirspeed; }
     void setApproachAirspeed(double airspeed);
@@ -113,6 +131,7 @@ public:
     Q_INVOKABLE void execute();
     Q_INVOKABLE void cancel();
     Q_INVOKABLE void resetDraft();
+    Q_INVOKABLE bool readCurrentRtkAltitude();
 
 signals:
     void vehicleChanged();
@@ -120,7 +139,14 @@ signals:
     void landingCoordinateChanged();
     void loiterAltitudeChanged();
     void landingAltitudeChanged();
+    void landingElevationChanged();
+    void loiterHeightAboveLandingChanged();
+    void homeAltitudeChanged();
+    void currentRtkAltitudeChanged();
+    void rtkAltitudeAvailableChanged();
     void loiterRadiusChanged();
+    void minimumLoiterRadiusChanged();
+    void airbrakeRadiusChanged();
     void tangentDistanceChanged();
     void approachAirspeedChanged();
     void clockwiseChanged();
@@ -194,7 +220,14 @@ private:
     void _setStateText(const QString& text);
     void _setErrorText(const QString& text);
     void _setPlanIdentity(quint32 planId, quint16 crc);
+    void _clearDraft();
     void _draftChanged();
+    void _homePositionChanged();
+    void _gcsPositionInfoUpdated(const QGeoPositionInfo& positionInfo);
+    void _syncProtocolAltitudesFromDisplay(bool markDraftChanged);
+    void _refreshLoiterRadiusParameter();
+    void _setLoiterRadiusFromVehicle(double radius);
+    void _refreshAirbrakeParameters();
     void _refreshTangentDistanceParameter();
     void _setTangentDistanceFromVehicle(double distance);
     void _applyPendingTangentDistance();
@@ -221,7 +254,14 @@ private:
     QGeoCoordinate _landingCoordinate;
     double _loiterAltitude = 50.0;
     double _landingAltitude = 0.0;
+    double _landingElevation = std::numeric_limits<double>::quiet_NaN();
+    double _loiterHeightAboveLanding = 50.0;
+    double _homeAltitude = std::numeric_limits<double>::quiet_NaN();
+    double _currentRtkAltitude = std::numeric_limits<double>::quiet_NaN();
     double _loiterRadius = 100.0;
+    double _minimumLoiterRadius = 100.0;
+    double _cruiseAirspeed = 0.0;
+    double _transitionDecel = 0.0;
     double _tangentDistance = 300.0;
     double _pendingTangentDistance = std::numeric_limits<double>::quiet_NaN();
     bool _hasPendingTangentDistance = false;
@@ -237,7 +277,6 @@ private:
     QString _errorText;
     quint32 _planId = 0;
     quint16 _planCrc = 0;
-
     QGeoCoordinate _followReturnLaunchCoordinate;
     QGeoCoordinate _followReturnEntryCoordinate;
     QGeoCoordinate _followReturnLoiterCoordinate;
@@ -249,6 +288,10 @@ private:
     bool _followReturnSafeClimbRequired = false;
     bool _followReturnModeActive = false;
     bool _followReturnPlanValid = false;
+
+    QPointer<Fact> _loiterRadiusFact;
+    QPointer<Fact> _cruiseAirspeedFact;
+    QPointer<Fact> _transitionDecelFact;
     QPointer<Fact> _tangentDistanceFact;
     QPointer<ParameterManager> _parameterManager;
 
@@ -263,6 +306,8 @@ private:
     static constexpr quint8 kProtocolVersion = 2;
     static constexpr int kMaxAttempts = 3;
     static constexpr int kRetryDelayMs = 250;
+    static constexpr double kFallbackLoiterRadius = 100.0;
+    static constexpr double kMaximumLoiterRadius = 10000.0;
     static constexpr double kDefaultTangentDistance = 300.0;
     static constexpr double kMinimumTangentDistance = 30.0;
     static constexpr double kMaximumTangentDistance = 5000.0;

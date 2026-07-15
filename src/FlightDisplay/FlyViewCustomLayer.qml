@@ -79,7 +79,12 @@ Item {
         readonly property var landingCoordinate: customLandingController.followReturnLandingCoordinate
         readonly property real loiterAltitude: customLandingController.followReturnLoiterAltitude
         readonly property real landingAltitude: 0
+        readonly property real landingElevation: landingCoordinate && landingCoordinate.isValid
+                                                      ? Number(landingCoordinate.altitude)
+                                                      : NaN
+        readonly property real loiterHeightAboveLanding: customLandingController.followReturnLoiterAltitude
         readonly property real loiterRadius: customLandingController.followReturnRadius
+        readonly property real airbrakeRadius: 0
         readonly property real tangentDistance: customLandingController.followReturnTangentDistance
         readonly property real approachAirspeed: 0
         readonly property bool clockwise: customLandingController.followReturnClockwise

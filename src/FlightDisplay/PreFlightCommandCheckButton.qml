@@ -18,12 +18,45 @@ import QGroundControl.ScreenTools
 PreFlightCheckButton {
     id: root
 
-    property bool commandAvailable: true
+    property var vehicle
+    property int testId:          -1
+    property bool sending:        false
+    property bool commandAccepted: false
 
     readonly property real _sendButtonWidth:  Math.max(ScreenTools.minTouchPixels * 1.25, ScreenTools.defaultFontPixelWidth * 7.5)
     readonly property real _sendButtonHeight: Math.max(ScreenTools.minTouchPixels * 0.78, ScreenTools.defaultFontPixelHeight * 1.7)
+    readonly property color _commandAcceptedColor: "#4a90e2"
 
-    signal commandRequested()
+    _color: _telemetryState === _statePassed && _manualState === _statePassed ?
+                _passedColor :
+                (_telemetryState === _stateFailed ?
+                     _failedColor :
+                     (commandAccepted ? _commandAcceptedColor : _pendingColor))
+
+    onVehicleChanged: {
+        sending = false
+        commandAccepted = false
+    }
+
+    Connections {
+        target: root.vehicle
+        ignoreUnknownSignals: true
+
+        function onFlightCheckActuatorTestCommandFinished(finishedTestId, accepted) {
+            if (finishedTestId === root.testId) {
+                root.sending = false
+                root.commandAccepted = accepted
+            }
+        }
+    }
+
+    Connections {
+        target: root
+
+        function onClicked() {
+            root.commandAccepted = false
+        }
+    }
 
     QGCPalette {
         id: qgcPal
@@ -75,9 +108,15 @@ PreFlightCheckButton {
             heightFactor:           0.18
             pointSize:              ScreenTools.smallFontPointSize
             backRadius:             Math.round(ScreenTools.defaultFontPixelWidth * 0.45)
-            text:                   qsTr("Send")
-            enabled:                root.enabled && root.commandAvailable
-            onClicked:              root.commandRequested()
+            text:                   root.sending ? qsTr("Sending") : qsTr("Send")
+            enabled:                root.enabled && !root.sending && !!root.vehicle
+            onClicked: {
+                root.commandAccepted = false
+                root.sending = true
+                if (!root.vehicle.startFlightCheckActuatorTest(root.testId)) {
+                    root.sending = false
+                }
+            }
 
             contentItem: Item {
                 QGCLabel {
@@ -88,5 +127,15 @@ PreFlightCheckButton {
                 }
             }
         }
+    }
+
+    function reset() {
+        _manualState = manualText === "" ? _statePassed : _statePending
+        if (telemetryFailure) {
+            _telemetryState = allowTelemetryFailureOverride ? _statePending : _stateFailed
+        } else {
+            _telemetryState = _statePassed
+        }
+        commandAccepted = false
     }
 }
