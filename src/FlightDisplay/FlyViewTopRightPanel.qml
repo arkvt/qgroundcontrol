@@ -1243,13 +1243,32 @@ Rectangle {
                         anchors.verticalCenter: parent.verticalCenter
                         width:          _scaleWidth
                         height:         _scaleHeight
-                        title:          qsTr("Speed")
+                        title:          qsTr("Ground Speed")
                         unit:           QGroundControl.unitsConversion.appSettingsSpeedUnitsString
                         valueText:      factNumberText(_activeVehicle ? _activeVehicle.groundSpeed : null, qsTr("N/A"))
                         numericValue:   factRawValue(_activeVehicle ? _activeVehicle.groundSpeed : null)
                         stepValue:      10
                         minimumValue:   0
                         leftScale:      false
+                    }
+
+                    QGCLabel {
+                        anchors.top:                speedTape.bottom
+                        anchors.topMargin:          Math.max(2, ScreenTools.defaultFontPixelHeight * 0.12)
+                        x:                          speedTape.x + speedTape.rulerCenterX() - (width / 2)
+                        width:                      speedTape.width
+                        text:                       qsTr("Airspeed") + " " +
+                                                    factText(_activeVehicle ? _activeVehicle.airSpeed : null, qsTr("N/A"))
+                        color:                      qgcPal.buttonText
+                        opacity:                    0.86
+                        font.family:                _panelFontFamily
+                        font.pointSize:             Math.max(7, ScreenTools.captionFontPointSize - 1)
+                        horizontalAlignment:        Text.AlignHCenter
+                        verticalAlignment:          Text.AlignVCenter
+                        fontSizeMode:               Text.HorizontalFit
+                        minimumPointSize:           7
+                        elide:                      Text.ElideNone
+                        maximumLineCount:           1
                     }
                 }
             }
@@ -1310,8 +1329,8 @@ Rectangle {
                     { "label": qsTr("Next WP"),      "value": factText(_activeVehicle ? _activeVehicle.distanceToNextWP : null, qsTr("N/A")) },
                     { "label": qsTr("Climb"),        "value": factText(_activeVehicle ? _activeVehicle.climbRate : null, qsTr("N/A")) },
                     { "label": qsTr("Voltage"),      "value": primaryVoltageText(_activeVehicle) },
-                    { "label": qsTr("Rel Alt"),      "value": factText(_activeVehicle ? _activeVehicle.altitudeRelative : null, qsTr("N/A")) },
                     { "label": qsTr("AMSL Alt"),     "value": factText(_activeVehicle ? _activeVehicle.altitudeAMSL : null, qsTr("N/A")) },
+                    { "label": qsTr("Rel Alt"),      "value": factText(_activeVehicle ? _activeVehicle.altitudeRelative : null, qsTr("N/A")) },
                     { "label": qsTr("GCS Rel Alt"),  "value": altitudeRelativeToGcsText(_activeVehicle, qsTr("N/A")) },
                     { "label": qsTr("Thr"),          "value": factText(_activeVehicle ? _activeVehicle.throttlePct : null, qsTr("N/A")) },
                     { "label": qsTr("GPS HDG"),      "value": factText(_activeVehicle && _activeVehicle.gps ? _activeVehicle.gps.courseOverGround : null, qsTr("N/A")) },

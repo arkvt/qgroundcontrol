@@ -116,6 +116,15 @@ Rectangle {
         return isFinite(value) ? value : fallback
     }
 
+    function _homeRelativeAltitudeText(value) {
+        var numericValue = Number(value)
+        if (!isFinite(numericValue)) {
+            return qsTr("Home") + " --"
+        }
+        var sign = numericValue >= 0 ? "+" : "-"
+        return qsTr("Home") + sign + Math.abs(numericValue).toFixed(1) + " " + qsTr("m")
+    }
+
     function _openExecuteConfirmation() {
         if (!executionAllowed || _confirmationDialog) {
             return
@@ -383,14 +392,23 @@ Rectangle {
                         onValueEdited: (newValue) => controller.landingElevation = newValue
                     }
 
-                    NumericFieldRow {
-                        label: qsTr("Altitude relative to Home")
-                        value: controller ? controller.landingAltitude : NaN
-                        units: qsTr("m")
-                        minimumValue: -1000
-                        maximumValue: 10000
-                        editable: _root.draftEditable
-                        onValueEdited: (newValue) => controller.landingAltitude = newValue
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: ScreenTools.defaultFontPixelWidth * 0.5
+
+                        QGCLabel {
+                            Layout.fillWidth: true
+                            text: qsTr("Synced from RTK by default")
+                            color: Qt.rgba(1, 1, 1, 0.58)
+                            font.pointSize: ScreenTools.smallFontPointSize
+                        }
+
+                        QGCLabel {
+                            text: _root._homeRelativeAltitudeText(
+                                      controller ? controller.landingAltitude : NaN)
+                            color: Qt.rgba(1, 1, 1, 0.68)
+                            font.pointSize: ScreenTools.smallFontPointSize
+                        }
                     }
                 }
             }
@@ -484,7 +502,7 @@ Rectangle {
 
             QGCLabel {
                 Layout.fillWidth: true
-                text: qsTr("Landing elevation and loiter height are converted to Home-relative altitudes when uploaded.")
+                text: qsTr("Landing elevation is converted relative to Home, and loiter height is added above the landing point when uploaded.")
                 wrapMode: Text.WordWrap
                 color: Qt.rgba(1, 1, 1, 0.58)
                 font.pointSize: ScreenTools.smallFontPointSize
