@@ -14,7 +14,7 @@ ToolStripAction {
     text:           qsTr("Checklist")
     iconSource:     "/res/flyview-checklist.svg"
     visible:        _useChecklist
-    enabled:        _useChecklist && _activeVehicle && !_activeVehicle.armed
+    enabled:        _useChecklist && _activeVehicle
 
     property var  _activeVehicle:   QGroundControl.multiVehicleManager.activeVehicle
     property bool _useChecklist:    QGroundControl.settingsManager.appSettings.useChecklist.rawValue && QGroundControl.corePlugin.options.preFlightChecklistUrl.toString().length

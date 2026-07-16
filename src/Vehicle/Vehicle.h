@@ -383,8 +383,9 @@ public:
     ///     @param timeoutSec Disabled motor after this amount of time
     Q_INVOKABLE void motorTest(int motor, int percent, int timeoutSecs, bool showError);
 
-    /// Starts one AeroFollow preflight actuator test. Test ids 0-4 select
-    /// the fixed-wing/lift motors, and 53-58 select the control-surface actions.
+    /// Starts one AeroFollow preflight actuator test. Test id 0 selects the
+    /// fixed-wing throttle, ids 1-4 select the lift motors, and 53-58 identify
+    /// logical control-surface actions.
     Q_INVOKABLE bool startFlightCheckActuatorTest(int testId);
 
     enum PIDTuningTelemetryMode {
@@ -1007,7 +1008,17 @@ private:
     static void _rebootCommandResultHandler(void* resultHandlerData, int compId, const mavlink_command_ack_t& ack, MavCmdResultFailureCode_t failureCode);
     struct FlightCheckCommandAckContext;
     static void _flightCheckCommandResultHandler(void* resultHandlerData, int compId, const mavlink_command_ack_t& ack, MavCmdResultFailureCode_t failureCode);
+    static void _flightCheckModeResultHandler(void* resultHandlerData, int compId, const mavlink_command_ack_t& ack, MavCmdResultFailureCode_t failureCode);
+    static void _flightCheckArmResultHandler(void* resultHandlerData, int compId, const mavlink_command_ack_t& ack, MavCmdResultFailureCode_t failureCode);
+    static void _flightCheckDisarmResultHandler(void* resultHandlerData, int compId, const mavlink_command_ack_t& ack, MavCmdResultFailureCode_t failureCode);
+    static void _flightCheckFbwaRestoreResultHandler(void* resultHandlerData, int compId, const mavlink_command_ack_t& ack, MavCmdResultFailureCode_t failureCode);
     void _finishFlightCheckCommand(quint64 requestId, bool accepted);
+    bool _armForFlightCheckThrottle(quint64 requestId);
+    bool _disarmAfterFlightCheckThrottle(quint64 requestId);
+    bool _startFlightCheckControlPulse(quint64 requestId);
+    bool _startFlightCheckMotorTest(quint64 requestId);
+    bool _restoreFlightCheckFbwa(quint64 requestId);
+    bool _sendFlightCheckManualControl(int16_t roll, int16_t pitch, int16_t throttle, int16_t yaw);
 
     int     _id;                    ///< Mavlink system id
     int     _defaultComponentId;
@@ -1064,7 +1075,16 @@ private:
     int             _flightCheckPendingTestId               = -1;
     quint64         _flightCheckRequestId                    = 0;
     QTimer          _flightCheckCommandTimeoutTimer;
-    static constexpr int _flightCheckCommandTimeoutMsecs    = 3500;
+    QTimer          _flightCheckControlPulseTimer;
+    bool            _flightCheckWaitingForArm               = false;
+    bool            _flightCheckWaitingForDisarm            = false;
+    int             _flightCheckControlPulseSendsRemaining  = 0;
+    int             _flightCheckThrottleZeroSendsRemaining  = 0;
+    int16_t         _flightCheckControlRoll                  = INT16_MAX;
+    int16_t         _flightCheckControlPitch                 = INT16_MAX;
+    int16_t         _flightCheckControlThrottle              = INT16_MAX;
+    int16_t         _flightCheckControlYaw                   = INT16_MAX;
+    static constexpr int _flightCheckCommandTimeoutMsecs    = 6000;
     bool            _readyToFlyAvailable                    = false;
     bool            _readyToFly                             = false;
     bool            _allSensorsHealthy                      = true;

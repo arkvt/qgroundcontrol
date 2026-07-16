@@ -85,7 +85,7 @@ ColumnLayout {
         } else if(vehicle.sub) {
             modelContainer.source = "qrc:/qml/QGroundControl/FlightDisplay/SubChecklist.qml"
         } else if(vehicle.fixedWing) {
-            modelContainer.source = "qrc:/qml/QGroundControl/FlightDisplay/FixedWingChecklist.qml"
+            modelContainer.source = "qrc:/qml/QGroundControl/FlightDisplay/VTOLChecklist.qml"
         } else {
             modelContainer.source = "qrc:/qml/QGroundControl/FlightDisplay/DefaultChecklist.qml"
         }

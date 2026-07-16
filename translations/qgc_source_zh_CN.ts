@@ -7397,8 +7397,8 @@ Click Ok to start the auto-tuning process.
     </message>
     <message>
       <location filename="../src/FlightDisplay/FlyViewTopRightPanel.qml" line="1291"/>
-      <source>IMU Temp</source>
-      <translation>IMU温度</translation>
+      <source>GCS Rel Alt</source>
+      <translation>地面站高差</translation>
     </message>
     <message>
       <location filename="../src/FlightDisplay/FlyViewTopRightPanel.qml" line="1292"/>
@@ -18602,8 +18602,8 @@ ROTATION_NONE 表示组件指向飞行方向。</translation>
       <translation>20. 单击“油门”按钮</translation>
     </message>
     <message>
-      <source>The fixed-wing motor should rotate counter-clockwise when viewed from tail to nose.</source>
-      <translation>固定翼电机逆时针旋转（从机尾向机头看）</translation>
+      <source>Keep the propeller area clear. The vehicle will arm automatically for this test, stop the motor, and disarm before continuing. The fixed-wing motor should rotate counter-clockwise when viewed from tail to nose.</source>
+      <translation>请确保螺旋桨区域无人、无障碍物。本次测试将自动解锁飞机、启动并停止固定翼电机，随后自动上锁。固定翼电机应逆时针旋转（从机尾向机头看）。</translation>
     </message>
     <message>
       <source>Lift Motor Check</source>

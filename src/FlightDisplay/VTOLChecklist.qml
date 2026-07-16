@@ -142,7 +142,7 @@ Item {
 
             PreFlightCommandCheckButton {
                 name:       qsTr("20. Test fixed-wing throttle")
-                manualText: qsTr("The fixed-wing motor should rotate counter-clockwise when viewed from tail to nose.")
+                manualText: qsTr("Keep the propeller area clear. The vehicle will arm automatically for this test, stop the motor, and disarm before continuing. The fixed-wing motor should rotate counter-clockwise when viewed from tail to nose.")
                 vehicle:    globals.activeVehicle
                 testId:     0
             }

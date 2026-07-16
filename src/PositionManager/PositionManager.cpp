@@ -122,6 +122,11 @@ void QGCPositionManager::_positionUpdated(const QGeoPositionInfo &update)
 {
     _geoPositionInfo = update;
 
+    const QGeoCoordinate sourceCoordinate = update.coordinate();
+    _setGCSAltitude(update.isValid() && sourceCoordinate.isValid() && qIsFinite(sourceCoordinate.altitude())
+        ? sourceCoordinate.altitude()
+        : qQNaN());
+
     QGeoCoordinate newGCSPosition(_gcsPosition);
 
     if (update.hasAttribute(QGeoPositionInfo::HorizontalAccuracy)) {
@@ -174,6 +179,16 @@ void QGCPositionManager::_setGCSPosition(const QGeoCoordinate& newGCSPosition)
     }
 }
 
+void QGCPositionManager::_setGCSAltitude(qreal newGCSAltitude)
+{
+    if ((qIsNaN(newGCSAltitude) && qIsNaN(_gcsAltitude)) || newGCSAltitude == _gcsAltitude) {
+        return;
+    }
+
+    _gcsAltitude = newGCSAltitude;
+    emit gcsAltitudeChanged(_gcsAltitude);
+}
+
 void QGCPositionManager::_setPositionSource(QGCPositionSource source)
 {
     if (_currentSource != nullptr) {
@@ -184,6 +199,7 @@ void QGCPositionManager::_setPositionSource(QGCPositionSource source)
         emit positionInfoUpdated(_geoPositionInfo);
 
         _setGCSPosition(QGeoCoordinate());
+        _setGCSAltitude(qQNaN());
 
         _setGCSHeading(qQNaN());
 
