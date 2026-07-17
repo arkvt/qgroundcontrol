@@ -541,12 +541,12 @@ Item {
         id: airbrakeCircleComponent
 
         MapCircle {
-            z: QGroundControl.zOrderMapItems - 2
+            z: QGroundControl.zOrderMapItems - 1
             center: _root.controller ? _root.controller.landingCoordinate : QtPositioning.coordinate()
             radius: _root.airbrakeRadiusMeters
-            border.width: 1
-            border.color: Qt.rgba(1.0, 0.62, 0.26, 0.45)
-            color: "transparent"
+            border.width: 2
+            border.color: Qt.rgba(1.0, 0.55, 0.12, 0.96)
+            color: Qt.rgba(1.0, 0.48, 0.08, 0.10)
             visible: _root.active && _root.landingCoordinateValid && _root.airbrakeRadiusMeters > 0
         }
     }
@@ -563,7 +563,8 @@ Item {
 
             sourceItem: QGCLabel {
                 text: qsTr("Deceleration zone")
-                color: Qt.rgba(1.0, 0.72, 0.42, 0.82)
+                color: Qt.rgba(1.0, 0.68, 0.30, 1.0)
+                font.bold: true
                 font.pointSize: ScreenTools.smallFontPointSize
                 style: Text.Outline
                 styleColor: "black"

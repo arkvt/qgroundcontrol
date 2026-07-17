@@ -7267,8 +7267,12 @@ Click Ok to start the auto-tuning process.
     </message>
     <message>
       <location filename="../src/FlightDisplay/FlyViewTopRightPanel.qml" line="1100"/>
-      <source>Speed</source>
-      <translation>速度</translation>
+      <source>Ground Speed</source>
+      <translation>地速</translation>
+    </message>
+    <message>
+      <source>Airspeed</source>
+      <translation>空速</translation>
     </message>
     <message>
       <location filename="../src/FlightDisplay/FlyViewTopRightPanel.qml" line="1155"/>
@@ -7397,8 +7401,8 @@ Click Ok to start the auto-tuning process.
     </message>
     <message>
       <location filename="../src/FlightDisplay/FlyViewTopRightPanel.qml" line="1291"/>
-      <source>IMU Temp</source>
-      <translation>IMU温度</translation>
+      <source>GCS Rel Alt</source>
+      <translation>地面站高差</translation>
     </message>
     <message>
       <location filename="../src/FlightDisplay/FlyViewTopRightPanel.qml" line="1292"/>
@@ -18602,8 +18606,8 @@ ROTATION_NONE 表示组件指向飞行方向。</translation>
       <translation>20. 单击“油门”按钮</translation>
     </message>
     <message>
-      <source>The fixed-wing motor should rotate counter-clockwise when viewed from tail to nose.</source>
-      <translation>固定翼电机逆时针旋转（从机尾向机头看）</translation>
+      <source>Keep the propeller area clear. The vehicle will arm automatically for this test, stop the motor, and disarm before continuing. The fixed-wing motor should rotate counter-clockwise when viewed from tail to nose.</source>
+      <translation>请确保螺旋桨区域无人、无障碍物。本次测试将自动解锁飞机、启动并停止固定翼电机，随后自动上锁。固定翼电机应逆时针旋转（从机尾向机头看）。</translation>
     </message>
     <message>
       <source>Lift Motor Check</source>
@@ -19662,13 +19666,14 @@ ROTATION_NONE 表示组件指向飞行方向。</translation>
   <context>
     <name>CustomLandingPanel</name>
 
-    <message><source>Landing elevation AMSL</source><translation>海拔高度</translation></message>
-    <message><source>Altitude relative to Home</source><translation>相对 Home 高度</translation></message>
+    <message><source>Landing elevation AMSL</source><translation>降落点海拔</translation></message>
+    <message><source>Home</source><translation>Home</translation></message>
+    <message><source>Synced from RTK by default</source><translation>默认同步自RTK</translation></message>
     <message><source>Sync altitude</source><translation>同步高度</translation></message>
     <message><source>Read current RTK altitude</source><translation> 同步地面站高度</translation></message>
     <message><source>Home: %1 m</source><translation>Home：%1 米</translation></message>
-    <message><source>Loiter height above landing</source><translation>滑降盘旋相对高度</translation></message>
-    <message><source>Landing elevation and loiter height are converted to Home-relative altitudes when uploaded.</source><translation>上传时会将降落海拔和滑降盘旋相对高度自动换算为相对 Home 高度。</translation></message>
+    <message><source>Loiter height above landing</source><translation>盘旋高度（相对降落点）</translation></message>
+    <message><source>Landing elevation is converted relative to Home, and loiter height is added above the landing point when uploaded.</source><translation>上传时会将降落点海拔换算为相对Home高度，并在降落点高度上叠加盘旋高度。</translation></message>
     <message>
       <location filename="../src/FlightDisplay/CustomLandingPanel.qml" line="42"/>
       <source>Waiting for the custom landing controller.</source>

@@ -28,6 +28,7 @@ class QGCPositionManager : public QObject
     // QML_UNCREATABLE("")
 
     Q_PROPERTY(QGeoCoordinate gcsPosition                   READ gcsPosition                    NOTIFY gcsPositionChanged)
+    Q_PROPERTY(qreal          gcsAltitude                   READ gcsAltitude                    NOTIFY gcsAltitudeChanged)
     Q_PROPERTY(qreal          gcsHeading                    READ gcsHeading                     NOTIFY gcsHeadingChanged)
     Q_PROPERTY(qreal          gcsPositionHorizontalAccuracy READ gcsPositionHorizontalAccuracy  NOTIFY gcsPositionHorizontalAccuracyChanged)
 
@@ -42,6 +43,7 @@ public:
 
     void init();
     QGeoCoordinate gcsPosition() const { return _gcsPosition; }
+    qreal gcsAltitude() const { return _gcsAltitude; }
     qreal gcsHeading() const { return _gcsHeading; }
     qreal gcsPositionHorizontalAccuracy() const { return _gcsPositionHorizontalAccuracy; }
     QGeoPositionInfo geoPositionInfo() const { return _geoPositionInfo; }
@@ -51,6 +53,7 @@ public:
 
 signals:
     void gcsPositionChanged(QGeoCoordinate gcsPosition);
+    void gcsAltitudeChanged(qreal gcsAltitude);
     void gcsHeadingChanged(qreal gcsHeading);
     void positionInfoUpdated(QGeoPositionInfo update);
     void gcsPositionHorizontalAccuracyChanged(qreal gcsPositionHorizontalAccuracy);
@@ -73,12 +76,14 @@ private:
     void _checkPermission();
     void _setGCSHeading(qreal newGCSHeading);
     void _setGCSPosition(const QGeoCoordinate &newGCSPosition);
+    void _setGCSAltitude(qreal newGCSAltitude);
 
     bool _usingPluginSource = false;
     int _updateInterval = 0;
 
     QGeoPositionInfo _geoPositionInfo;
     QGeoCoordinate _gcsPosition;
+    qreal _gcsAltitude = qQNaN();
     qreal _gcsHeading = qQNaN();
     qreal _gcsPositionHorizontalAccuracy = std::numeric_limits<qreal>::infinity();
     qreal _gcsPositionVerticalAccuracy = std::numeric_limits<qreal>::infinity();

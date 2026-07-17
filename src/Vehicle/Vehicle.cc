@@ -283,11 +283,65 @@ void Vehicle::_commonInit()
     _flightCheckCommandTimeoutTimer.setSingleShot(true);
     connect(&_flightCheckCommandTimeoutTimer, &QTimer::timeout, this, [this]() {
         if (_flightCheckCommandPending) {
-            const int testId = _flightCheckPendingTestId;
-            _flightCheckPendingTestId = -1;
-            _flightCheckCommandPending = false;
-            emit flightCheckActuatorTestCommandFinished(testId, false);
+            _finishFlightCheckCommand(_flightCheckRequestId, false);
         }
+    });
+
+    connect(this, &Vehicle::armedChanged, this, [this](bool armed) {
+        if (!_flightCheckCommandPending || _flightCheckPendingTestId != 0) {
+            return;
+        }
+        if (_flightCheckWaitingForArm && armed) {
+            _flightCheckWaitingForArm = false;
+            _startFlightCheckControlPulse(_flightCheckRequestId);
+        } else if (_flightCheckWaitingForDisarm && !armed) {
+            _flightCheckWaitingForDisarm = false;
+            _restoreFlightCheckFbwa(_flightCheckRequestId);
+        }
+    });
+
+    _flightCheckControlPulseTimer.setInterval(100);
+    connect(&_flightCheckControlPulseTimer, &QTimer::timeout, this, [this]() {
+        const bool manualControlTest = _flightCheckPendingTestId == 0 ||
+                                       (_flightCheckPendingTestId >= 53 && _flightCheckPendingTestId <= 58);
+        if (!_flightCheckCommandPending || !manualControlTest ||
+            (_flightCheckPendingTestId == 0 && !armed())) {
+            _flightCheckControlPulseTimer.stop();
+            if (_flightCheckCommandPending && manualControlTest) {
+                _finishFlightCheckCommand(_flightCheckRequestId, false);
+            }
+            return;
+        }
+
+        if (_flightCheckControlPulseSendsRemaining > 0) {
+            if (!_sendFlightCheckManualControl(_flightCheckControlRoll,
+                                               _flightCheckControlPitch,
+                                               _flightCheckControlThrottle,
+                                               _flightCheckControlYaw)) {
+                _finishFlightCheckCommand(_flightCheckRequestId, false);
+                return;
+            }
+            --_flightCheckControlPulseSendsRemaining;
+            return;
+        }
+
+        if (_flightCheckPendingTestId == 0 && _flightCheckThrottleZeroSendsRemaining > 0) {
+            if (!_sendFlightCheckManualControl(INT16_MAX, INT16_MAX, 0, INT16_MAX)) {
+                _finishFlightCheckCommand(_flightCheckRequestId, false);
+                return;
+            }
+            --_flightCheckThrottleZeroSendsRemaining;
+            return;
+        }
+
+        if (_flightCheckPendingTestId == 0) {
+            _flightCheckControlPulseTimer.stop();
+            _sendFlightCheckManualControl(INT16_MAX, INT16_MAX, INT16_MAX, INT16_MAX);
+            _disarmAfterFlightCheckThrottle(_flightCheckRequestId);
+            return;
+        }
+
+        _finishFlightCheckCommand(_flightCheckRequestId, true);
     });
 
     connect(QGCPositionManager::instance(), &QGCPositionManager::gcsPositionChanged, this, &Vehicle::_updateDistanceToGCS);
@@ -3244,15 +3298,22 @@ void Vehicle::motorTest(int motor, int percent, int timeoutSecs, bool showError)
 
 bool Vehicle::startFlightCheckActuatorTest(int testId)
 {
+    static constexpr uint32_t kManualCustomMode = 0;
+    static constexpr uint32_t kFbwaCustomMode = 5;
     static constexpr int kFirstActionCode = 53;
     static constexpr int kLastActionCode = 58;
-    static constexpr int kFirstMotor = 0;
+    static constexpr int kFixedWingThrottle = 0;
+    static constexpr int kFirstMotor = 1;
     static constexpr int kLastMotor = 4;
 
     const bool controlSurfaceTest = testId >= kFirstActionCode && testId <= kLastActionCode;
+    const bool fixedWingThrottleTest = testId == kFixedWingThrottle;
     const bool motorTest = testId >= kFirstMotor && testId <= kLastMotor;
 
-    if ((!controlSurfaceTest && !motorTest) || _flightCheckCommandPending) {
+    if ((!controlSurfaceTest && !fixedWingThrottleTest && !motorTest) ||
+        _flightCheckCommandPending ||
+        (fixedWingThrottleTest && armed()) ||
+        (motorTest && armed())) {
         return false;
     }
 
@@ -3261,7 +3322,133 @@ bool Vehicle::startFlightCheckActuatorTest(int testId)
     _flightCheckCommandPending = true;
     _flightCheckCommandTimeoutTimer.start(_flightCheckCommandTimeoutMsecs);
 
-    auto* context = new FlightCheckCommandAckContext(this, _flightCheckRequestId);
+    if (controlSurfaceTest || fixedWingThrottleTest) {
+        // QuadPlane assistance can start the lift motors when fixed-wing
+        // throttle is applied in FBWA at low airspeed. Run the throttle pulse
+        // briefly in MANUAL, then restore FBWA after returning throttle to 0.
+        const uint32_t requiredCustomMode = fixedWingThrottleTest ? kManualCustomMode : kFbwaCustomMode;
+        const bool alreadyInRequiredMode = (_base_mode & MAV_MODE_FLAG_CUSTOM_MODE_ENABLED) &&
+                                           _custom_mode == requiredCustomMode;
+        if (alreadyInRequiredMode) {
+            return fixedWingThrottleTest ? _armForFlightCheckThrottle(_flightCheckRequestId)
+                                         : _startFlightCheckControlPulse(_flightCheckRequestId);
+        }
+
+        auto* context = new FlightCheckCommandAckContext(this, _flightCheckRequestId);
+        const MavCmdAckHandlerInfo_t handlerInfo = {
+            /* .resultHandler = */ &Vehicle::_flightCheckModeResultHandler,
+            /* .resultHandlerData = */ context,
+            /* .progressHandler = */ nullptr,
+            /* .progressHandlerData = */ nullptr,
+        };
+
+        sendMavCommandWithHandler(&handlerInfo,
+                                  _defaultComponentId,
+                                  MAV_CMD_DO_SET_MODE,
+                                  MAV_MODE_FLAG_CUSTOM_MODE_ENABLED,
+                                  requiredCustomMode);
+        return true;
+    }
+
+    return _startFlightCheckMotorTest(_flightCheckRequestId);
+}
+
+bool Vehicle::_armForFlightCheckThrottle(quint64 requestId)
+{
+    if (!_flightCheckCommandPending || requestId != _flightCheckRequestId ||
+        _flightCheckPendingTestId != 0 || armed()) {
+        return false;
+    }
+
+    auto* context = new FlightCheckCommandAckContext(this, requestId);
+    const MavCmdAckHandlerInfo_t handlerInfo = {
+        /* .resultHandler = */ &Vehicle::_flightCheckArmResultHandler,
+        /* .resultHandlerData = */ context,
+        /* .progressHandler = */ nullptr,
+        /* .progressHandlerData = */ nullptr,
+    };
+
+    _flightCheckCommandTimeoutTimer.start(_flightCheckCommandTimeoutMsecs);
+    sendMavCommandWithHandler(&handlerInfo,
+                              _defaultComponentId,
+                              MAV_CMD_COMPONENT_ARM_DISARM,
+                              1.0f);
+    return true;
+}
+
+bool Vehicle::_disarmAfterFlightCheckThrottle(quint64 requestId)
+{
+    if (!_flightCheckCommandPending || requestId != _flightCheckRequestId ||
+        _flightCheckPendingTestId != 0 || !armed()) {
+        _finishFlightCheckCommand(requestId, false);
+        return false;
+    }
+
+    auto* context = new FlightCheckCommandAckContext(this, requestId);
+    const MavCmdAckHandlerInfo_t handlerInfo = {
+        /* .resultHandler = */ &Vehicle::_flightCheckDisarmResultHandler,
+        /* .resultHandlerData = */ context,
+        /* .progressHandler = */ nullptr,
+        /* .progressHandlerData = */ nullptr,
+    };
+
+    _flightCheckCommandTimeoutTimer.start(_flightCheckCommandTimeoutMsecs);
+    sendMavCommandWithHandler(&handlerInfo,
+                              _defaultComponentId,
+                              MAV_CMD_COMPONENT_ARM_DISARM,
+                              0.0f);
+    return true;
+}
+
+bool Vehicle::_startFlightCheckControlPulse(quint64 requestId)
+{
+    if (!_flightCheckCommandPending || requestId != _flightCheckRequestId) {
+        return false;
+    }
+
+    _flightCheckControlRoll = INT16_MAX;
+    _flightCheckControlPitch = INT16_MAX;
+    _flightCheckControlThrottle = INT16_MAX;
+    _flightCheckControlYaw = INT16_MAX;
+
+    switch (_flightCheckPendingTestId) {
+    case 0:  _flightCheckControlThrottle = 100; break;
+    case 53: _flightCheckControlPitch = -500; break;
+    case 54: _flightCheckControlPitch =  500; break;
+    case 55: _flightCheckControlRoll  = -500; break;
+    case 56: _flightCheckControlRoll  =  500; break;
+    case 57: _flightCheckControlYaw   = -500; break;
+    case 58: _flightCheckControlYaw   =  500; break;
+    default:
+        _finishFlightCheckCommand(requestId, false);
+        return false;
+    }
+
+    if (!_sendFlightCheckManualControl(_flightCheckControlRoll,
+                                       _flightCheckControlPitch,
+                                       _flightCheckControlThrottle,
+                                       _flightCheckControlYaw)) {
+        _finishFlightCheckCommand(requestId, false);
+        return false;
+    }
+
+    // Keep the fixed-wing throttle active for two seconds. Control-surface
+    // pulses remain shorter so the aircraft returns to neutral promptly.
+    _flightCheckControlPulseSendsRemaining = _flightCheckPendingTestId == 0 ? 19 : 8;
+    _flightCheckThrottleZeroSendsRemaining = _flightCheckPendingTestId == 0 ? 10 : 0;
+    _flightCheckControlPulseTimer.start();
+    _flightCheckCommandTimeoutTimer.start(_flightCheckCommandTimeoutMsecs);
+    return true;
+}
+
+bool Vehicle::_startFlightCheckMotorTest(quint64 requestId)
+{
+    if (!_flightCheckCommandPending || requestId != _flightCheckRequestId ||
+        _flightCheckPendingTestId < 0 || _flightCheckPendingTestId > 4) {
+        return false;
+    }
+
+    auto* context = new FlightCheckCommandAckContext(this, requestId);
     const MavCmdAckHandlerInfo_t handlerInfo = {
         /* .resultHandler = */ &Vehicle::_flightCheckCommandResultHandler,
         /* .resultHandlerData = */ context,
@@ -3269,13 +3456,159 @@ bool Vehicle::startFlightCheckActuatorTest(int testId)
         /* .progressHandlerData = */ nullptr,
     };
 
-    if (controlSurfaceTest) {
-        sendMavCommandWithHandler(&handlerInfo, _defaultComponentId, MAV_CMD_DO_MOTOR_TEST, 0, testId, 50, 2);
-    } else {
-        sendMavCommandWithHandler(&handlerInfo, _defaultComponentId, MAV_CMD_DO_MOTOR_TEST, testId, MOTOR_TEST_THROTTLE_PERCENT, 10, 2, 0, MOTOR_TEST_ORDER_BOARD);
+    sendMavCommandWithHandler(&handlerInfo,
+                              _defaultComponentId,
+                              MAV_CMD_DO_MOTOR_TEST,
+                              _flightCheckPendingTestId,
+                              MOTOR_TEST_THROTTLE_PERCENT,
+                              20,
+                              2,
+                              0,
+                              MOTOR_TEST_ORDER_DEFAULT);
+    return true;
+}
+
+bool Vehicle::_sendFlightCheckManualControl(int16_t roll, int16_t pitch, int16_t throttle, int16_t yaw)
+{
+    SharedLinkInterfacePtr sharedLink = vehicleLinkManager()->primaryLink().lock();
+    if (!sharedLink || sharedLink->linkConfiguration()->isHighLatency()) {
+        return false;
     }
 
+    mavlink_message_t message;
+    mavlink_msg_manual_control_pack_chan(
+        static_cast<uint8_t>(MAVLinkProtocol::instance()->getSystemId()),
+        static_cast<uint8_t>(MAVLinkProtocol::getComponentId()),
+        sharedLink->mavlinkChannel(),
+        &message,
+        static_cast<uint8_t>(_id),
+        pitch,
+        roll,
+        throttle,
+        yaw,
+        0, 0,
+        0,
+        0, 0,
+        0, 0, 0, 0, 0, 0);
+    sendMessageOnLinkThreadSafe(sharedLink.get(), message);
     return true;
+}
+
+bool Vehicle::_restoreFlightCheckFbwa(quint64 requestId)
+{
+    static constexpr uint32_t kFbwaCustomMode = 5;
+
+    if (!_flightCheckCommandPending || requestId != _flightCheckRequestId || _flightCheckPendingTestId != 0) {
+        return false;
+    }
+
+    auto* context = new FlightCheckCommandAckContext(this, requestId);
+    const MavCmdAckHandlerInfo_t handlerInfo = {
+        /* .resultHandler = */ &Vehicle::_flightCheckFbwaRestoreResultHandler,
+        /* .resultHandlerData = */ context,
+        /* .progressHandler = */ nullptr,
+        /* .progressHandlerData = */ nullptr,
+    };
+
+    _flightCheckCommandTimeoutTimer.start(_flightCheckCommandTimeoutMsecs);
+    sendMavCommandWithHandler(&handlerInfo,
+                              _defaultComponentId,
+                              MAV_CMD_DO_SET_MODE,
+                              MAV_MODE_FLAG_CUSTOM_MODE_ENABLED,
+                              kFbwaCustomMode);
+    return true;
+}
+
+void Vehicle::_flightCheckModeResultHandler(void* resultHandlerData, int /*compId*/, const mavlink_command_ack_t& ack, MavCmdResultFailureCode_t failureCode)
+{
+    auto* context = static_cast<FlightCheckCommandAckContext*>(resultHandlerData);
+    if (!context) {
+        return;
+    }
+
+    Vehicle* vehicle = context->vehicle;
+    const quint64 requestId = context->requestId;
+    const bool accepted = failureCode == MavCmdResultCommandResultOnly && ack.result == MAV_RESULT_ACCEPTED;
+    delete context;
+
+    if (!vehicle) {
+        return;
+    }
+
+    if (accepted) {
+        if (vehicle->_flightCheckPendingTestId == 0) {
+            vehicle->_armForFlightCheckThrottle(requestId);
+        } else {
+            vehicle->_startFlightCheckControlPulse(requestId);
+        }
+    } else {
+        vehicle->_finishFlightCheckCommand(requestId, false);
+    }
+}
+
+void Vehicle::_flightCheckArmResultHandler(void* resultHandlerData, int /*compId*/, const mavlink_command_ack_t& ack, MavCmdResultFailureCode_t failureCode)
+{
+    auto* context = static_cast<FlightCheckCommandAckContext*>(resultHandlerData);
+    if (!context) {
+        return;
+    }
+
+    Vehicle* vehicle = context->vehicle;
+    const quint64 requestId = context->requestId;
+    const bool accepted = failureCode == MavCmdResultCommandResultOnly && ack.result == MAV_RESULT_ACCEPTED;
+    delete context;
+
+    if (!vehicle) {
+        return;
+    }
+    if (!accepted) {
+        vehicle->_finishFlightCheckCommand(requestId, false);
+    } else if (vehicle->armed()) {
+        vehicle->_startFlightCheckControlPulse(requestId);
+    } else {
+        vehicle->_flightCheckWaitingForArm = true;
+    }
+}
+
+void Vehicle::_flightCheckDisarmResultHandler(void* resultHandlerData, int /*compId*/, const mavlink_command_ack_t& ack, MavCmdResultFailureCode_t failureCode)
+{
+    auto* context = static_cast<FlightCheckCommandAckContext*>(resultHandlerData);
+    if (!context) {
+        return;
+    }
+
+    Vehicle* vehicle = context->vehicle;
+    const quint64 requestId = context->requestId;
+    const bool accepted = failureCode == MavCmdResultCommandResultOnly && ack.result == MAV_RESULT_ACCEPTED;
+    delete context;
+
+    if (!vehicle) {
+        return;
+    }
+    if (!accepted) {
+        vehicle->_finishFlightCheckCommand(requestId, false);
+    } else if (!vehicle->armed()) {
+        vehicle->_restoreFlightCheckFbwa(requestId);
+    } else {
+        vehicle->_flightCheckWaitingForDisarm = true;
+    }
+}
+
+void Vehicle::_flightCheckFbwaRestoreResultHandler(void* resultHandlerData, int /*compId*/, const mavlink_command_ack_t& ack, MavCmdResultFailureCode_t failureCode)
+{
+    auto* context = static_cast<FlightCheckCommandAckContext*>(resultHandlerData);
+    if (!context) {
+        return;
+    }
+
+    Vehicle* vehicle = context->vehicle;
+    const quint64 requestId = context->requestId;
+    const bool accepted = failureCode == MavCmdResultCommandResultOnly && ack.result == MAV_RESULT_ACCEPTED;
+    delete context;
+
+    if (vehicle) {
+        vehicle->_finishFlightCheckCommand(requestId, accepted);
+    }
 }
 
 void Vehicle::_flightCheckCommandResultHandler(void* resultHandlerData, int /*compId*/, const mavlink_command_ack_t& ack, MavCmdResultFailureCode_t failureCode)
@@ -3302,7 +3635,19 @@ void Vehicle::_finishFlightCheckCommand(quint64 requestId, bool accepted)
     }
 
     const int testId = _flightCheckPendingTestId;
+    if (testId == 0 || (testId >= 53 && testId <= 58)) {
+        _flightCheckControlPulseTimer.stop();
+        _sendFlightCheckManualControl(INT16_MAX, INT16_MAX, INT16_MAX, INT16_MAX);
+    }
+    if (testId == 0 && !accepted) {
+        // This is always a normal disarm request. The autopilot retains the
+        // authority to reject it if its own safety checks do not allow it.
+        setArmed(false, true);
+    }
     _flightCheckPendingTestId = -1;
+    _flightCheckWaitingForArm = false;
+    _flightCheckWaitingForDisarm = false;
+    _flightCheckThrottleZeroSendsRemaining = 0;
     _flightCheckCommandTimeoutTimer.stop();
     _flightCheckCommandPending = false;
     emit flightCheckActuatorTestCommandFinished(testId, accepted);
