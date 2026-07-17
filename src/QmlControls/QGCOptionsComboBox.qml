@@ -12,6 +12,7 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import QtQuick.Window
 
 import QGroundControl.Controls
 import QGroundControl.Palette
@@ -20,6 +21,7 @@ import QGroundControl.ScreenTools
 ComboBox {
     id:         control
     padding:    ScreenTools.comboBoxPadding
+    hoverEnabled: !ScreenTools.isMobile
 
     property string labelText:  qsTr("Options")
 
@@ -35,9 +37,10 @@ ComboBox {
     background: Rectangle {
         implicitWidth:                  ScreenTools.implicitComboBoxWidth
         implicitHeight:                 ScreenTools.implicitComboBoxHeight
-        color:                          _controlQGCPal.window
-        border.width:                   enabled ? 1 : 0
-        border.color:                   "#999"
+        color:                          Qt.rgba(1, 1, 1, control.pressed ? 0.10 : (control.hovered ? 0.07 : 0.045))
+        border.width:                   1
+        border.color:                   Qt.rgba(0.82, 0.90, 0.95, control.hovered ? 0.26 : 0.18)
+        radius:                         Math.round(ScreenTools.buttonBorderRadius * 1.25)
     }
 
     /*! Adding the Combobox list item to the theme.  */
@@ -66,9 +69,11 @@ ComboBox {
             Rectangle {
                 height:         ScreenTools.defaultFontPixelHeight
                 width:          height
-                border.color:   _itemQGCPal.buttonText
+                border.color:   checked ? _itemQGCPal.primaryButton : Qt.rgba(0.82, 0.90, 0.95, 0.24)
                 border.width:   1
-                color:          _itemQGCPal.button
+                color:          checked ? Qt.rgba(_itemQGCPal.primaryButton.r, _itemQGCPal.primaryButton.g, _itemQGCPal.primaryButton.b, 0.18)
+                                        : Qt.rgba(1, 1, 1, 0.045)
+                radius:         Math.round(width * 0.22)
 
                 QGCColoredImage {
                     anchors.centerIn:   parent
@@ -91,7 +96,8 @@ ComboBox {
         }
 
         background: Rectangle {
-            color: _controlQGCPal.button
+            color:          control.highlightedIndex === index ? Qt.rgba(1, 1, 1, 0.075) : "transparent"
+            radius:         Math.round(ScreenTools.defaultFontPixelWidth * 0.45)
         }
 
         onClicked: {
@@ -104,6 +110,34 @@ ComboBox {
             _control._flashText = text
             _control._showFlash = true
             _control.popup.close()
+        }
+    }
+
+    popup: Popup {
+        x:              control.mirrored ? 0 : control.width - width
+        y:              control.height
+        width:          control.width
+        height:         Math.min(contentItem.implicitHeight + topPadding + bottomPadding,
+                                 control.Window.height - topMargin - bottomMargin)
+        topMargin:      6
+        bottomMargin:   6
+        padding:        1
+
+        contentItem: ListView {
+            clip:                   true
+            implicitHeight:         contentHeight
+            model:                  control.popup.visible ? control.delegateModel : null
+            currentIndex:           control.highlightedIndex
+            highlightMoveDuration:  0
+
+            ScrollIndicator.vertical: ScrollIndicator { }
+        }
+
+        background: Rectangle {
+            color:          Qt.rgba(0.045, 0.048, 0.052, 0.94)
+            radius:         Math.round(ScreenTools.defaultFontPixelWidth * 0.65)
+            border.color:   Qt.rgba(0.82, 0.90, 0.95, 0.18)
+            border.width:   1
         }
     }
 
@@ -143,9 +177,11 @@ ComboBox {
             Rectangle {
                 height:         ScreenTools.defaultFontPixelHeight
                 width:          height
-                border.color:   _controlQGCPal.buttonText
+                border.color:   _flashChecked ? _controlQGCPal.primaryButton : Qt.rgba(0.82, 0.90, 0.95, 0.24)
                 border.width:   1
-                color:          _controlQGCPal.window
+                color:          _flashChecked ? Qt.rgba(_controlQGCPal.primaryButton.r, _controlQGCPal.primaryButton.g, _controlQGCPal.primaryButton.b, 0.18)
+                                              : Qt.rgba(1, 1, 1, 0.045)
+                radius:         Math.round(width * 0.22)
 
                 QGCColoredImage {
                     anchors.centerIn:   parent

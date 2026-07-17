@@ -23,6 +23,7 @@ Item {
     property real   viewportMargins:    0
     property var    toolStrip
     property bool   allowOutsideParent: false
+    property var    backdropSourceItem: toolStrip && toolStrip.backdropSourceItem !== undefined ? toolStrip.backdropSourceItem : null
 
     // Should be an enum but that get's into the whole problem of creating a singleton which isn't worth the effort
     readonly property int dropLeft:     1
@@ -33,8 +34,8 @@ Item {
     readonly property real _arrowBaseHeight:    radius             // Height of vertical side of arrow
     readonly property real _arrowPointWidth:    allowOutsideParent ? 0 : radius * 0.666     // Distance from vertical side to point
     readonly property real _dropMargin:         ScreenTools.defaultFontPixelWidth
-    readonly property color _panelColor:        Qt.rgba(0.045, 0.048, 0.052, 0.72)
-    readonly property color _panelBorderColor:  Qt.rgba(0.82, 0.88, 0.94, 0.075)
+    readonly property color _panelColor:        Qt.rgba(0.045, 0.048, 0.052, 0.68)
+    readonly property color _panelBorderColor:  Qt.rgba(0.82, 0.90, 0.95, 0.14)
 
     property var    _dropEdgeTopPoint
     property alias  _dropDownComponent: panelLoader.sourceComponent
@@ -125,39 +126,43 @@ Item {
             property point arrowBase2: Qt.point(0, 0)
 
             onPaint: {
-                var panelX = _arrowPointWidth
-                var panelY = 0
-                var panelWidth = parent.width - _arrowPointWidth
-                var panelHeight = parent.height
-                var cornerRadius = Math.min(ScreenTools.defaultFontPixelWidth * 0.85, panelWidth / 2, panelHeight / 2)
-
                 var context = getContext("2d")
                 context.reset()
-                context.beginPath()
-
-                context.moveTo(panelX + cornerRadius, panelY)
-                context.lineTo(panelX + panelWidth - cornerRadius, panelY)
-                context.quadraticCurveTo(panelX + panelWidth, panelY, panelX + panelWidth, panelY + cornerRadius)
-                context.lineTo(panelX + panelWidth, panelY + panelHeight - cornerRadius)
-                context.quadraticCurveTo(panelX + panelWidth, panelY + panelHeight, panelX + panelWidth - cornerRadius, panelY + panelHeight)
-                context.lineTo(panelX + cornerRadius, panelY + panelHeight)
-                context.quadraticCurveTo(panelX, panelY + panelHeight, panelX, panelY + panelHeight - cornerRadius)
                 if (!allowOutsideParent) {
-                    context.lineTo(panelX, arrowBase2.y)
-                    context.lineTo(arrowPoint.x, arrowPoint.y)
+                    context.beginPath()
+                    context.moveTo(arrowPoint.x, arrowPoint.y)
                     context.lineTo(arrowBase1.x, arrowBase1.y)
+                    context.lineTo(arrowBase2.x, arrowBase2.y)
+                    context.closePath()
+                    context.fillStyle = _panelColor
+                    context.fill()
+                    context.strokeStyle = _panelBorderColor
+                    context.lineWidth = 1
+                    context.stroke()
                 }
-                context.lineTo(panelX, panelY + cornerRadius)
-                context.quadraticCurveTo(panelX, panelY, panelX + cornerRadius, panelY)
-
-                context.closePath()
-                context.fillStyle = _panelColor
-                context.fill()
-                context.strokeStyle = _panelBorderColor
-                context.lineWidth = 1
-                context.stroke()
             }
         } // Canvas - arrowCanvas
+
+        GlassBackdrop {
+            id:                     panelGlass
+            x:                      _arrowPointWidth
+            width:                  Math.max(1, parent.width - _arrowPointWidth)
+            height:                 parent.height
+            sourceItem:             _root.backdropSourceItem
+            targetItem:             panelGlass
+            backdropBlurEnabled:    _root.visible && !!_root.backdropSourceItem
+            cornerRadius:           Math.min(ScreenTools.defaultFontPixelWidth * 0.85, width / 2, height / 2)
+        }
+
+        Rectangle {
+            x:              _arrowPointWidth
+            width:          Math.max(1, parent.width - _arrowPointWidth)
+            height:         parent.height
+            radius:         Math.min(ScreenTools.defaultFontPixelWidth * 0.85, width / 2, height / 2)
+            color:          "transparent"
+            border.color:   Qt.rgba(0.82, 0.90, 0.95, 0.14)
+            border.width:   1
+        }
 
         QGCFlickable {
             id:                 panelItemFlickable

@@ -57,13 +57,6 @@ Rectangle {
         backdropBlurEnabled:true
         targetItem:         vehiclePanel
         cornerRadius:       vehiclePanel.radius
-        sourceScale:        0.46
-        blurAmount:         0.94
-        blurMax:            42
-        sourceBrightness:   -0.01
-        sourceSaturation:   0.62
-        tintColor:          Qt.rgba(0.045, 0.048, 0.052, 0.68)
-        sheenColor:         "transparent"
     }
 
     function batteryText(vehicle) {

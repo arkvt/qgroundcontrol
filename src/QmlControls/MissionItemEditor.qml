@@ -186,6 +186,7 @@ Rectangle {
 
         DropPanel {
             id: hamburgerMenuDropPanel
+            backdropSourceItem: _root.map
 
             sourceComponent: Component {
                 ColumnLayout {
@@ -193,6 +194,7 @@ Rectangle {
 
                     QGCButton {
                         Layout.fillWidth:   true
+                        glassStyle:         true
                         text:               qsTr("Move to vehicle position")
                         enabled:            _activeVehicle && missionItem.specifiesCoordinate
 
@@ -206,6 +208,7 @@ Rectangle {
 
                     QGCButton {
                         Layout.fillWidth:   true
+                        glassStyle:         true
                         text:               qsTr("Move to previous item position")
                         enabled:            _missionController.previousCoordinate.isValid
                         onClicked: {
@@ -216,6 +219,7 @@ Rectangle {
 
                     QGCButton {
                         Layout.fillWidth:   true
+                        glassStyle:         true
                         text:               qsTr("Edit position...")
                         enabled:            missionItem.specifiesCoordinate
                         onClicked: {

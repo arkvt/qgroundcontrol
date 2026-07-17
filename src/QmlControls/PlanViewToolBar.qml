@@ -40,13 +40,6 @@ Rectangle {
         targetItem:         _root
         sampleAtItemPosition: false
         sampleY:            0
-        sourceScale:        0.42
-        blurAmount:         0.84
-        blurMax:            36
-        sourceBrightness:   -0.05
-        sourceSaturation:   0.54
-        tintColor:          Qt.rgba(0.045, 0.048, 0.052, 0.68)
-        sheenColor:         "transparent"
     }
 
     /// Bottom single pixel divider

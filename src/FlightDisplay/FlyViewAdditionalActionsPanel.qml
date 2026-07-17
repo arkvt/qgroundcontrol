@@ -27,6 +27,7 @@ ColumnLayout {
 
         QGCButton {
             Layout.fillWidth:   true
+            glassStyle:         true
             text:               modelData.title
             visible:            modelData.visible
 
@@ -43,6 +44,7 @@ ColumnLayout {
 
         QGCButton {
             Layout.fillWidth:   true
+            glassStyle:         true
             text:               modelData.title
             visible:            modelData.visible
 
@@ -59,6 +61,7 @@ ColumnLayout {
 
         QGCButton {
             Layout.fillWidth:   true
+            glassStyle:         true
             text:               object.label
 
             onClicked: {

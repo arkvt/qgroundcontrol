@@ -21,14 +21,16 @@ Rectangle {
     id:         _root
     width:      ScreenTools.defaultFontPixelWidth * 35
     height:     mainLayout.height + (_margins * 2)
-    radius:     ScreenTools.defaultFontPixelWidth / 2
-    color:      Qt.rgba(0.045, 0.048, 0.052, 0.88)
-    border.color: Qt.rgba(0.82, 0.88, 0.94, 0.14)
-    border.width: 1
+    radius:     Math.round(ScreenTools.defaultFontPixelWidth * 0.78)
+    color:      "transparent"
+    border.color: "transparent"
+    border.width: 0
+    clip:       true
     visible:    _utmspEnabled === true ? utmspSliderTrigger: false
 
     property var    guidedController
     property var    guidedValueSlider
+    property var    backdropSourceItem
     property string title                                       // Currently unused
     property alias  message:            messageText.text
     property int    action
@@ -88,6 +90,22 @@ Rectangle {
     }
 
     QGCPalette { id: qgcPal }
+
+    GlassBackdrop {
+        anchors.fill:        parent
+        sourceItem:          _root.backdropSourceItem
+        targetItem:          _root
+        backdropBlurEnabled: _root.visible && !!_root.backdropSourceItem
+        cornerRadius:        _root.radius
+    }
+
+    Rectangle {
+        anchors.fill: parent
+        color:        "transparent"
+        radius:       _root.radius
+        border.color: Qt.rgba(0.82, 0.90, 0.95, 0.14)
+        border.width: 1
+    }
 
     ColumnLayout {
         id:                 mainLayout

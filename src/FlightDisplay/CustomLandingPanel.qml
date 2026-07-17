@@ -62,6 +62,7 @@ Rectangle {
 
     property var _confirmationDialog
     property real _margin: Math.max(7, ScreenTools.defaultFontPixelWidth * 0.6)
+    readonly property color _accentColor: qgcPal.primaryButton
 
     width: Math.max(300, ScreenTools.defaultFontPixelWidth * 31)
     height: Math.min(contentColumn.implicitHeight + (_margin * 2),
@@ -69,7 +70,7 @@ Rectangle {
     radius: Math.round(ScreenTools.defaultFontPixelWidth * 0.8)
     color: "transparent"
     border.width: 1
-    border.color: Qt.rgba(0.82, 0.88, 0.94, 0.12)
+    border.color: Qt.rgba(0.82, 0.90, 0.95, 0.14)
     clip: true
 
     QGCPalette {
@@ -83,13 +84,6 @@ Rectangle {
         backdropBlurEnabled: true
         targetItem: _root
         cornerRadius: _root.radius
-        sourceScale: 0.46
-        blurAmount: 0.94
-        blurMax: 42
-        sourceBrightness: -0.01
-        sourceSaturation: 0.62
-        tintColor: Qt.rgba(0.045, 0.048, 0.052, 0.78)
-        sheenColor: "transparent"
     }
 
     // The panel itself must consume clicks, while the rest of the custom layer
@@ -216,7 +210,7 @@ Rectangle {
         implicitWidth: Math.max(ScreenTools.defaultFontPixelHeight * 1.45, ScreenTools.minTouchPixels * 0.62)
         implicitHeight: implicitWidth
         radius: width / 2
-        color: selected ? qgcPal.mapMissionTrajectory : Qt.rgba(1, 1, 1, 0.10)
+        color: Qt.rgba(1, 1, 1, 0.10)
         border.width: 1
         border.color: selected ? Qt.rgba(1, 1, 1, 0.65) : Qt.rgba(1, 1, 1, 0.18)
 
@@ -292,6 +286,7 @@ Rectangle {
 
             QGCButton {
                 Layout.fillWidth: true
+                glassStyle: true
                 visible: controller && !controller.capabilitySupported && !controller.busy
                 text: qsTr("Check capability again")
                 onClicked: controller.queryCapability()
@@ -322,7 +317,7 @@ Rectangle {
                 color: Qt.rgba(1, 1, 1, 0.055)
                 border.width: !_root.landingCoordinateValid ? 2 : 1
                 border.color: !_root.landingCoordinateValid
-                                  ? qgcPal.mapMissionTrajectory
+                                  ? _root._accentColor
                                   : Qt.rgba(0.82, 0.88, 0.94, 0.12)
 
                 ColumnLayout {
@@ -375,6 +370,7 @@ Rectangle {
                             topPadding: 0
                             bottomPadding: 0
                             iconSource: "qrc:/InstrumentValueIcons/refresh.svg"
+                            glassStyle: true
                             enabled: _root.draftEditable && controller && controller.rtkAltitudeAvailable
                             ToolTip.visible: hovered
                             ToolTip.text: qsTr("Sync altitude")
@@ -420,7 +416,7 @@ Rectangle {
                 color: Qt.rgba(1, 1, 1, 0.055)
                 border.width: _root.landingCoordinateValid && !_root.loiterCoordinateValid ? 2 : 1
                 border.color: _root.landingCoordinateValid && !_root.loiterCoordinateValid
-                                  ? qgcPal.mapMissionTrajectory
+                                  ? _root._accentColor
                                   : Qt.rgba(0.82, 0.88, 0.94, 0.12)
 
                 ColumnLayout {
@@ -511,7 +507,11 @@ Rectangle {
             SectionDivider { }
 
             QGCButton {
-                Layout.fillWidth: true
+                Layout.preferredWidth: contentColumn.width * 0.72
+                Layout.minimumWidth: ScreenTools.minTouchPixels * 4
+                Layout.alignment: Qt.AlignHCenter
+                primary: true
+                textColor: "white"
                 text: qsTr("Review and execute")
                 enabled: _root.executionAllowed
                 onClicked: _root._openExecuteConfirmation()

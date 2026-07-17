@@ -14,12 +14,15 @@ import QtQuick.Dialogs
 import QGroundControl
 import QGroundControl.Vehicle
 import QGroundControl.Controls
+import QGroundControl.ScreenTools
 
 /// Popup container for preflight checklists
 QGCPopupDialog {
     id:         _root
     title:      qsTr("Pre-Flight Checklist")
     buttons:    Dialog.Close
+    glassStyle: true
+    _contentMargin: ScreenTools.defaultFontPixelHeight * 0.8
 
     property var    _activeVehicle:     QGroundControl.multiVehicleManager.activeVehicle
     property bool   _useChecklist:      QGroundControl.settingsManager.appSettings.useChecklist.rawValue && QGroundControl.corePlugin.options.preFlightChecklistUrl.toString().length

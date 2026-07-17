@@ -287,6 +287,7 @@ Rectangle {
 
                 QGCButton {
                     text:                       qsTr("Set To Map Center")
+                    glassStyle:                 true
                     onClicked:                  missionItem.coordinate = map.center
                     anchors.horizontalCenter:   parent.horizontalCenter
                 }

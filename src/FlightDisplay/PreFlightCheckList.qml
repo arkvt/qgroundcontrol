@@ -138,6 +138,7 @@ ColumnLayout {
             width:              1.2 * ScreenTools.defaultFontPixelHeight
             height:             1.2 * ScreenTools.defaultFontPixelHeight
             Layout.alignment:   Qt.AlignVCenter
+            glassStyle:         true
             onClicked:          checkListRepeater.model.reset()
 
             QGCColoredImage {

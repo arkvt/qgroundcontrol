@@ -120,6 +120,7 @@ Rectangle {
 
             QGCButton {
                 text:       _setToVehicleHeadingStr
+                glassStyle: true
                 visible:    globals.activeVehicle
                 onClicked:  missionItem.landingHeading.rawValue = globals.activeVehicle.heading.rawValue
             }
@@ -190,6 +191,7 @@ Rectangle {
 
                 QGCButton {
                     text:               _setToVehicleLocationStr
+                    glassStyle:         true
                     visible:            globals.activeVehicle
                     Layout.columnSpan:  2
                     onClicked:          missionItem.landingCoordinate = globals.activeVehicle.coordinate
@@ -307,6 +309,7 @@ Rectangle {
             QGCButton {
                 anchors.horizontalCenter:   parent.horizontalCenter
                 text:                       _setToVehicleLocationStr
+                glassStyle:                 true
                 visible:                    globals.activeVehicle
 
                 onClicked: {
@@ -344,6 +347,7 @@ Rectangle {
             QGCButton {
                 text:               qsTr("Done")
                 Layout.fillWidth:   true
+                glassStyle:         true
                 onClicked: {
                     missionItem.wizardMode = false
                     missionItem.landingDragAngleOnly = false

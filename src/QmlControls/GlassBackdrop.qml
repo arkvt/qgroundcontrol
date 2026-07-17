@@ -18,15 +18,22 @@ Item {
     property bool  sampleAtItemPosition:  true
     property real  sampleX:               0
     property real  sampleY:               0
-    property real  sourceScale:           0.50
-    property real  blurAmount:            0.78
-    property real  blurMax:               32
-    property real  sourceBrightness:     -0.08
+    property real  sourcePadding:         0
+    // Canonical workspace glass material. Callers configure only geometry and sampling;
+    // keeping the optical values here prevents individual overlays from drifting apart.
+    property real  sourceScale:           0.46
+    property real  blurAmount:            0.94
+    property real  blurMax:               42
+    property real  sourceBrightness:     -0.01
+    // Retained source saturation: 1.0 keeps the original color, 0.0 is grayscale.
+    // MultiEffect.saturation is an adjustment value, so convert this ratio below.
     property real  sourceSaturation:      0.62
-    property color tintColor:             Qt.rgba(0.045, 0.048, 0.052, 0.80)
-    property color sheenColor:            Qt.rgba(1, 1, 1, 0.0)
+    property color tintColor:             Qt.rgba(0.045, 0.048, 0.052, 0.68)
+    property color sheenColor:            "transparent"
     property bool  backdropBlurEnabled:   true
     property real  cornerRadius:          0
+
+    readonly property real _effectiveSourcePadding: Math.max(0, sourcePadding)
 
     clip: true
 
@@ -36,7 +43,10 @@ Item {
         }
 
         var sourcePoint = sampleAtItemPosition ? targetItem.mapToItem(sourceItem, 0, 0) : Qt.point(sampleX, sampleY)
-        return Qt.rect(sourcePoint.x, sourcePoint.y, Math.max(1, width), Math.max(1, height))
+        return Qt.rect(sourcePoint.x - _effectiveSourcePadding,
+                       sourcePoint.y - _effectiveSourcePadding,
+                       Math.max(1, width + (_effectiveSourcePadding * 2)),
+                       Math.max(1, height + (_effectiveSourcePadding * 2)))
     }
 
     Item {
@@ -46,30 +56,39 @@ Item {
         visible: false
     }
 
-    ShaderEffectSource {
-        id:             backdropTexture
-        anchors.fill:   parent
-        visible:        false
-        live:           glassBackdrop.backdropBlurEnabled && !!glassBackdrop.sourceItem && glassBackdrop.visible
-        recursive:      false
-        hideSource:     false
-        sourceItem:     glassBackdrop.sourceItem ? glassBackdrop.sourceItem : emptySource
-        sourceRect:     glassBackdrop.sourceSampleRect()
-        textureSize:    Qt.size(Math.max(1, Math.round(glassBackdrop.width * glassBackdrop.sourceScale)),
-                                Math.max(1, Math.round(glassBackdrop.height * glassBackdrop.sourceScale)))
-    }
+    Item {
+        id:     blurLayer
+        x:      -glassBackdrop._effectiveSourcePadding
+        y:      -glassBackdrop._effectiveSourcePadding
+        width:  glassBackdrop.width + (glassBackdrop._effectiveSourcePadding * 2)
+        height: glassBackdrop.height + (glassBackdrop._effectiveSourcePadding * 2)
 
-    MultiEffect {
-        anchors.fill:   parent
-        visible:        glassBackdrop.backdropBlurEnabled && !!glassBackdrop.sourceItem && glassBackdrop.blurAmount > 0
-        source:         backdropTexture
-        blurEnabled:    glassBackdrop.backdropBlurEnabled && glassBackdrop.blurAmount > 0
-        blurMax:        glassBackdrop.blurMax
-        blur:           glassBackdrop.blurAmount
-        brightness:     glassBackdrop.sourceBrightness
-        saturation:     glassBackdrop.sourceSaturation
-        maskEnabled:    glassBackdrop.cornerRadius > 0
-        maskSource:     roundedMask
+        ShaderEffectSource {
+            id:             backdropTexture
+            anchors.fill:   parent
+            visible:        false
+            live:           glassBackdrop.backdropBlurEnabled && !!glassBackdrop.sourceItem && glassBackdrop.visible
+            recursive:      false
+            hideSource:     false
+            sourceItem:     glassBackdrop.sourceItem ? glassBackdrop.sourceItem : emptySource
+            sourceRect:     glassBackdrop.sourceSampleRect()
+            textureSize:    Qt.size(Math.max(1, Math.round(blurLayer.width * glassBackdrop.sourceScale)),
+                                    Math.max(1, Math.round(blurLayer.height * glassBackdrop.sourceScale)))
+        }
+
+        MultiEffect {
+            anchors.fill:   parent
+            visible:        glassBackdrop.backdropBlurEnabled && !!glassBackdrop.sourceItem && glassBackdrop.blurAmount > 0
+            source:         backdropTexture
+            autoPaddingEnabled: false
+            blurEnabled:    glassBackdrop.backdropBlurEnabled && glassBackdrop.blurAmount > 0
+            blurMax:        glassBackdrop.blurMax
+            blur:           glassBackdrop.blurAmount
+            brightness:     glassBackdrop.sourceBrightness
+            saturation:     Math.max(-1.0, glassBackdrop.sourceSaturation - 1.0)
+            maskEnabled:    glassBackdrop.cornerRadius > 0
+            maskSource:     roundedMask
+        }
     }
 
     Rectangle {
@@ -89,13 +108,16 @@ Item {
 
     Item {
         id:             roundedMask
-        width:          glassBackdrop.width
-        height:         glassBackdrop.height
+        width:          blurLayer.width
+        height:         blurLayer.height
         visible:        false
         layer.enabled:  true
 
         Rectangle {
-            anchors.fill:   parent
+            x:              glassBackdrop._effectiveSourcePadding
+            y:              glassBackdrop._effectiveSourcePadding
+            width:          glassBackdrop.width
+            height:         glassBackdrop.height
             radius:         glassBackdrop.cornerRadius
             color:          "black"
         }

@@ -699,13 +699,6 @@ Item {
                 sourceItem:         editorMap
                 targetItem:         rightPanel
                 cornerRadius:       rightPanel.radius
-                sourceScale:        0.42
-                blurAmount:         0.92
-                blurMax:            42
-                sourceBrightness:   -0.04
-                sourceSaturation:   0.52
-                tintColor:          Qt.rgba(0.045, 0.048, 0.052, 0.68)
-                sheenColor:         "transparent"
             }
         }
         //-------------------------------------------------------
@@ -981,6 +974,7 @@ Item {
                 QGCButton {
                     text:               modelData
                     Layout.fillWidth:   true
+                    glassStyle:         true
 
                     onClicked: {
                         insertComplexItemAfterCurrent(modelData)
@@ -1111,6 +1105,7 @@ Item {
                 QGCButton {
                     text:               qsTr("Open...")
                     Layout.fillWidth:   true
+                    glassStyle:         true
                     enabled:            !_planMasterController.syncInProgress
                     onClicked: {
                         dropPanel.hide()
@@ -1125,6 +1120,7 @@ Item {
                 QGCButton {
                     text:               qsTr("Save")
                     Layout.fillWidth:   true
+                    glassStyle:         true
                     enabled:            !_planMasterController.syncInProgress && _planMasterController.currentPlanFile !== ""
                     onClicked: {
                         dropPanel.hide()
@@ -1139,6 +1135,7 @@ Item {
                 QGCButton {
                     text:               qsTr("Save As...")
                     Layout.fillWidth:   true
+                    glassStyle:         true
                     enabled:            !_planMasterController.syncInProgress && _planMasterController.containsItems
                     onClicked: {
                         dropPanel.hide()
@@ -1150,6 +1147,7 @@ Item {
                     Layout.columnSpan:  3
                     Layout.fillWidth:   true
                     text:               qsTr("Save Mission Waypoints As KML...")
+                    glassStyle:         true
                     enabled:            !_planMasterController.syncInProgress && _visualItems.count > 1
                     onClicked: {
                         // First point does not count
@@ -1177,6 +1175,8 @@ Item {
                 QGCButton {
                     text:               qsTr("Upload")
                     Layout.fillWidth:   true
+                    primary:            true
+                    textColor:          "white"
                     enabled:            !_planMasterController.offline && !_planMasterController.syncInProgress && _planMasterController.containsItems
                     visible:            !QGroundControl.corePlugin.options.disableVehicleConnection
                     onClicked: {
@@ -1188,6 +1188,7 @@ Item {
                 QGCButton {
                     text:               qsTr("Download")
                     Layout.fillWidth:   true
+                    glassStyle:         true
                     enabled:            !_planMasterController.offline && !_planMasterController.syncInProgress
                     visible:            !QGroundControl.corePlugin.options.disableVehicleConnection
 
@@ -1201,6 +1202,7 @@ Item {
                     text:               qsTr("Clear")
                     Layout.fillWidth:   true
                     Layout.columnSpan:  2
+                    glassStyle:         true
                     enabled:            !_planMasterController.offline && !_planMasterController.syncInProgress
                     visible:            !QGroundControl.corePlugin.options.disableVehicleConnection
                     onClicked: {

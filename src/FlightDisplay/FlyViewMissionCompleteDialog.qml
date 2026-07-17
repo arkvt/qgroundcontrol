@@ -82,6 +82,7 @@ Item {
 
                 QGCButton {
                     Layout.fillWidth:   true
+                    glassStyle:         true
                     text:               qsTr("Remove plan from vehicle")
                     visible:            !_activeVehicle.communicationLost// && !_activeVehicle.apmFirmware  // ArduPilot has a bug somewhere with mission clear
                     onClicked: {
@@ -93,6 +94,7 @@ Item {
                 QGCButton {
                     Layout.fillWidth:   true
                     Layout.alignment:   Qt.AlignHCenter
+                    glassStyle:         true
                     text:               qsTr("Leave plan on vehicle")
                     onClicked:          missionCompleteDialog.close()
 
@@ -112,6 +114,7 @@ Item {
                     QGCButton {
                         Layout.fillWidth:   true
                         Layout.alignment:   Qt.AlignHCenter
+                        primary:            true
                         text:               qsTr("Resume Mission From Waypoint %1").arg(globals.guidedControllerFlyView._resumeMissionIndex)
 
                         onClicked: {

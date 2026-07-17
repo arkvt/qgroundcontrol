@@ -18,11 +18,14 @@ import QGroundControl.Palette
 import QGroundControl.ScreenTools
 
 ColumnLayout {
+    id:    root
     width: _rightPanelWidth
+    property var backdropSourceItem
 
     TerrainProgress {
         Layout.alignment:       Qt.AlignTop
         Layout.preferredWidth:  _rightPanelWidth
+        backdropSourceItem:     parent.backdropSourceItem
     }
 
     // We use a Loader to load the photoVideoControlComponent only when the active vehicle is not null
@@ -39,6 +42,7 @@ ColumnLayout {
             id: photoVideoControlComponent
 
             PhotoVideoControl {
+                backdropSourceItem: root.backdropSourceItem
             }
         }
     }

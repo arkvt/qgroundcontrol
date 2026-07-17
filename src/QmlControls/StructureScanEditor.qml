@@ -174,6 +174,7 @@ Rectangle {
 
                     QGCButton {
                         text:       qsTr("Rotate entry point")
+                        glassStyle: true
                         onClicked:  missionItem.rotateEntryPoint()
                     }
                 } // Column - Scan

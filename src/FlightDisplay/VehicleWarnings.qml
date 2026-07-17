@@ -15,20 +15,39 @@ import QGroundControl.Controls
 import QGroundControl.Palette
 
 Rectangle {
+    id:                 _root
     anchors.margins:    -ScreenTools.defaultFontPixelHeight
     height:             warningsCol.height
     width:              warningsCol.width
-    color:              Qt.rgba(0.045, 0.048, 0.052, 0.82)
-    border.color:       Qt.rgba(0.82, 0.88, 0.94, 0.14)
-    border.width:       1
-    radius:             ScreenTools.defaultFontPixelWidth / 2
+    color:              "transparent"
+    border.color:       "transparent"
+    border.width:       0
+    radius:             Math.round(ScreenTools.defaultFontPixelWidth * 0.78)
+    clip:               true
     visible:            _noGPSLockVisible || _prearmErrorVisible
 
+    property var  backdropSourceItem
     property var  _activeVehicle:       QGroundControl.multiVehicleManager.activeVehicle
     property bool _noGPSLockVisible:    _activeVehicle && _activeVehicle.requiresGpsFix && !_activeVehicle.coordinate.isValid
     property bool _prearmErrorVisible:  _activeVehicle && !_activeVehicle.armed && _activeVehicle.prearmError && !_activeVehicle.healthAndArmingCheckReport.supported
 
     QGCPalette { id: qgcPal; colorGroupEnabled: true }
+
+    GlassBackdrop {
+        anchors.fill:        parent
+        sourceItem:          _root.backdropSourceItem
+        targetItem:          _root
+        backdropBlurEnabled: _root.visible && !!_root.backdropSourceItem
+        cornerRadius:        _root.radius
+    }
+
+    Rectangle {
+        anchors.fill: parent
+        color:        "transparent"
+        radius:       _root.radius
+        border.color: Qt.rgba(0.82, 0.90, 0.95, 0.14)
+        border.width: 1
+    }
 
     Column {
         id:         warningsCol

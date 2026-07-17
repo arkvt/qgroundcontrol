@@ -639,11 +639,13 @@ Item {
             anchors.horizontalCenterOffset: mapControl.centerViewport.left + (mapControl.centerViewport.width / 2)
             y:                              mapControl.centerViewport.top
             availableWidth:                 mapControl.centerViewport.width
+            backdropSource:                 mapControl
 
             QGCButton {
                 _horizontalPadding: 2
                 text:               qsTr("Automatic")
                 visible:            !mapPolygon.traceMode
+                glassStyle:         true
                 onClicked:          _resetPolygon()
             }
 
@@ -651,6 +653,7 @@ Item {
             QGCButton {
                 _horizontalPadding: 2
                 text:               mapPolygon.traceMode ? qsTr("Done fencing") : qsTr("Mannual")
+                glassStyle:         true
                 onClicked: {
                     if (mapPolygon.traceMode) {
                         if (mapPolygon.count < 3) {

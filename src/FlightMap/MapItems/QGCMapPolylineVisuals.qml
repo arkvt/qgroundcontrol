@@ -326,17 +326,20 @@ Item {
             y:                              mapControl.centerViewport.top
             z:                              QGroundControl.zOrderMapItems + 2
             availableWidth:                 mapControl.centerViewport.width
+            backdropSource:                 mapControl
 
             QGCButton {
                 _horizontalPadding: 0
                 text:               qsTr("Basic")
                 visible:            !mapPolyline.traceMode
+                glassStyle:         true
                 onClicked:          _resetPolyline()
             }
 
             QGCButton {
                 _horizontalPadding: 0
                 text:               mapPolyline.traceMode ? qsTr("Done Tracing") : qsTr("Trace")
+                glassStyle:         true
                 onClicked: {
                     if (mapPolyline.traceMode) {
                         if (mapPolyline.count < 2) {
@@ -354,6 +357,7 @@ Item {
             QGCButton {
                 _horizontalPadding: 0
                 text:               qsTr("Load KML/SHP...")
+                glassStyle:         true
                 onClicked:          kmlOrSHPLoadDialog.openForLoad()
                 visible:            !mapPolyline.traceMode
             }

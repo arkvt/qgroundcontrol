@@ -207,6 +207,7 @@ RowLayout {
                 enabled:            _armed || !_healthAndArmingChecksSupported || _activeVehicle.healthAndArmingCheckReport.canArm
                 text:               _armed ?  qsTr("Disarm") : (forceArm ? qsTr("Force Arm") : qsTr("Arm"))
                 Layout.alignment:   Qt.AlignLeft
+                glassStyle:         true
 
                 property bool forceArm: false
 
@@ -399,7 +400,8 @@ RowLayout {
         ToolIndicatorPage {
             contentComponent: Component {
                 QGCButton {
-                    text: _vtolInFWDFlight ? qsTr("Transition to Multi-Rotor") : qsTr("Transition to Fixed Wing")
+                    text:       _vtolInFWDFlight ? qsTr("Transition to Multi-Rotor") : qsTr("Transition to Fixed Wing")
+                    glassStyle: true
 
                     onClicked: {
                         if (_vtolInFWDFlight) {

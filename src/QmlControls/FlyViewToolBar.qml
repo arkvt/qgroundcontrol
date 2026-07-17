@@ -223,13 +223,6 @@ Rectangle {
         sampleAtItemPosition:   false
         sampleX:                0
         sampleY:                0
-        sourceScale:            0.34
-        blurAmount:             0.94
-        blurMax:                46
-        sourceBrightness:       -0.01
-        sourceSaturation:       0.62
-        tintColor:              Qt.rgba(0.045, 0.048, 0.052, 0.68)
-        sheenColor:             "transparent"
     }
 
     component BarDivider: Rectangle {
@@ -507,6 +500,7 @@ Rectangle {
             Layout.alignment:       Qt.AlignVCenter
             Layout.preferredHeight: _root._topControlHeight
             heightFactor:           0
+            glassStyle:             true
             text:                   qsTr("Disconnect")
             onClicked:              _activeVehicle.closeVehicle()
             visible:                _activeVehicle && _communicationLost

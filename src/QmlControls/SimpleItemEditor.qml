@@ -95,6 +95,7 @@ Rectangle {
             QGCButton {
                 text:               qsTr("Done")
                 Layout.fillWidth:   true
+                glassStyle:         true
                 visible:            !initialClickLabel.visible
                 onClicked: {
                     missionItem.wizardMode = false

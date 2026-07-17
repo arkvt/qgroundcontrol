@@ -587,11 +587,13 @@ Item {
             anchors.horizontalCenterOffset: mapControl.centerViewport.left + (mapControl.centerViewport.width / 2)
             y:                              mapControl.centerViewport.top
             availableWidth:                 mapControl.centerViewport.width
+            backdropSource:                 mapControl
 
             QGCButton {
                 _horizontalPadding: 0
                 text:               qsTr("Basic")
                 visible:            !mapPolygon.traceMode
+                glassStyle:         true
                 onClicked:          _resetPolygon()
             }
 
@@ -599,12 +601,14 @@ Item {
                 _horizontalPadding: 0
                 text:               qsTr("Circular")
                 visible:            !mapPolygon.traceMode
+                glassStyle:         true
                 onClicked:          _resetCircle()
             }
 
             QGCButton {
                 _horizontalPadding: 0
                 text:               mapPolygon.traceMode ? qsTr("Done Tracing") : qsTr("Trace")
+                glassStyle:         true
                 onClicked: {
                     if (mapPolygon.traceMode) {
                         if (mapPolygon.count < 3) {
@@ -623,6 +627,7 @@ Item {
             QGCButton {
                 _horizontalPadding: 0
                 text:               qsTr("Load KML/SHP...")
+                glassStyle:         true
                 onClicked:          kmlOrSHPLoadDialog.openForLoad()
                 visible:            !mapPolygon.traceMode
             }

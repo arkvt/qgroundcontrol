@@ -17,13 +17,16 @@ import QGroundControl.Controls
 import QGroundControl.Palette
 
 Rectangle {
+    id:             _root
     implicitHeight: mainLayout.height + (_margins * 2)
     visible:        false
-    color:          Qt.rgba(0.045, 0.048, 0.052, 0.88)
+    color:          "transparent"
     radius:         Math.round(ScreenTools.defaultFontPixelWidth * 0.65)
-    border.color:   Qt.rgba(0.82, 0.88, 0.94, 0.14)
-    border.width:   1
+    border.color:   "transparent"
+    border.width:   0
+    clip:           true
 
+    property var    backdropSourceItem
     property var    _activeVehicle: QGroundControl.multiVehicleManager.activeVehicle
     property real   _margins:       ScreenTools.defaultFontPixelWidth / 2
     property real   _totalBlocks:   _activeVehicle ? _activeVehicle.terrain.blocksPending.rawValue + _activeVehicle.terrain.blocksLoaded.rawValue : 0
@@ -58,6 +61,22 @@ Rectangle {
     }
 
     QGCPalette { id: qgcPal }
+
+    GlassBackdrop {
+        anchors.fill:        parent
+        sourceItem:          _root.backdropSourceItem
+        targetItem:          _root
+        backdropBlurEnabled: _root.visible && !!_root.backdropSourceItem
+        cornerRadius:        _root.radius
+    }
+
+    Rectangle {
+        anchors.fill: parent
+        color:        "transparent"
+        radius:       _root.radius
+        border.color: Qt.rgba(0.82, 0.90, 0.95, 0.14)
+        border.width: 1
+    }
 
     ColumnLayout {
         id:                 mainLayout

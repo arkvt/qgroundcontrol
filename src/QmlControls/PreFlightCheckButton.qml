@@ -66,15 +66,30 @@ QGCButton {
     rightPadding:   _horizontalPadding
 
     background: Rectangle {
-        color:          qgcPal.button
-        border.color:   qgcPal.button;
+        radius:         backRadius
+        color:          pressed ? Qt.rgba(1, 1, 1, 0.095) :
+                            (hovered ? Qt.rgba(1, 1, 1, 0.070) : Qt.rgba(1, 1, 1, 0.040))
+        border.color:   Qt.rgba(0.82, 0.90, 0.95, hovered ? 0.26 : 0.15)
+        border.width:   1
 
         Rectangle {
-            color:          _color
-            anchors.left:   parent.left
-            anchors.top:    parent.top
-            anchors.bottom: parent.bottom
-            width:          _stateFlagWidth
+            anchors.left:       parent.left
+            anchors.top:        parent.top
+            anchors.bottom:     parent.bottom
+            anchors.margins:    Math.max(3, ScreenTools.defaultFontPixelWidth * 0.28)
+            width:              Math.max(4, ScreenTools.defaultFontPixelWidth * 0.42)
+            radius:             width / 2
+            color:              _color
+        }
+
+        Rectangle {
+            anchors.left:        parent.left
+            anchors.right:       parent.right
+            anchors.top:         parent.top
+            anchors.leftMargin:  parent.radius
+            anchors.rightMargin: parent.radius
+            height:              1
+            color:               Qt.rgba(1, 1, 1, 0.14)
         }
     }
 

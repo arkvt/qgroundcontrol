@@ -7275,6 +7275,10 @@ Click Ok to start the auto-tuning process.
       <translation>空速</translation>
     </message>
     <message>
+      <source>Home AMSL</source>
+      <translation>Home海拔</translation>
+    </message>
+    <message>
       <location filename="../src/FlightDisplay/FlyViewTopRightPanel.qml" line="1155"/>
       <source>V/S</source>
       <translation>垂速</translation>

@@ -133,6 +133,7 @@ Item {
             z:                      _fullItemZorder + 2 // we need to add one extra layer for map 3d viewer (normally was 1)
             parentToolInsets:       _toolInsets
             mapControl:             _mapControl
+            dialogBackdropSourceItem: _root
             visible:                !QGroundControl.videoManager.fullScreen
             utmspActTrigger:        utmspSendActTrigger
             isViewer3DOpen:         viewer3DWindow.isOpen
@@ -173,6 +174,7 @@ Item {
             anchors.bottom:     parent.bottom
             z:                  QGroundControl.zOrderTopMost
             visible:            false
+            backdropSourceItem: mapControl
         }
 
         Viewer3D{

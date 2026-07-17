@@ -45,13 +45,14 @@ Rectangle {
         sourceItem:         root.backdropSourceItem
         targetItem:         root
         cornerRadius:       root.radius
-        sourceScale:        0.42
-        blurAmount:         0.94
-        blurMax:            42
-        sourceBrightness:   -0.01
-        sourceSaturation:   0.62
-        tintColor:          Qt.rgba(0.045, 0.048, 0.052, 0.68)
-        sheenColor:         "transparent"
+    }
+
+    Rectangle {
+        anchors.fill:   parent
+        color:          "transparent"
+        radius:         root.radius
+        border.color:   Qt.rgba(0.82, 0.90, 0.95, 0.14)
+        border.width:   1
     }
 
     QGCLabel {
@@ -86,6 +87,7 @@ Rectangle {
                 margins.bottom:     0
                 margins.left:       0
                 backgroundColor:    "transparent"
+                plotAreaColor:      "transparent"
                 legend.visible:     false
                 antialiasing:       true
 

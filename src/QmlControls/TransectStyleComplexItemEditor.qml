@@ -122,6 +122,7 @@ Rectangle {
                 QGCButton {
                     Layout.alignment:   Qt.AlignHCenter
                     text:               qsTr("Rotate Entry Point")
+                    glassStyle:         true
                     onClicked:          _missionItem.rotateEntryPoint()
                     visible:            transectValuesHeader.checked
                 }
@@ -177,6 +178,7 @@ Rectangle {
                     QGCButton {
                         Layout.fillWidth:   true
                         text:               qsTr("Apply Preset")
+                        glassStyle:         true
                         enabled:            _missionItem.presetNames.length != 0
                         onClicked:          _missionItem.loadPreset(presetCombo.textAt(presetCombo.currentIndex))
                     }
@@ -184,6 +186,7 @@ Rectangle {
                     QGCButton {
                         Layout.fillWidth:   true
                         text:               qsTr("Delete Preset")
+                        glassStyle:         true
                         enabled:            _missionItem.presetNames.length != 0
                         onClicked:          deletePresetDialog.createObject(mainWindow, { presetName: presetCombo.textAt(presetCombo.currentIndex) }).open()
 
@@ -209,6 +212,7 @@ Rectangle {
                     Layout.alignment:   Qt.AlignCenter
                     Layout.fillWidth:   true
                     text:               qsTr("Save Settings As New Preset")
+                    glassStyle:         true
                     onClicked:          savePresetDialog.createObject(mainWindow).open()
                 }
 

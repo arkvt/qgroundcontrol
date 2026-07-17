@@ -42,13 +42,6 @@ Rectangle {
         backdropBlurEnabled:true
         targetItem:         _root
         cornerRadius:       _root.radius
-        sourceScale:        0.46
-        blurAmount:         0.94
-        blurMax:            42
-        sourceBrightness:   -0.01
-        sourceSaturation:   0.62
-        tintColor:          Qt.rgba(0.045, 0.048, 0.052, 0.68)
-        sheenColor:         "transparent"
     }
 
     function simulateClick(buttonIndex) {
@@ -128,7 +121,7 @@ Rectangle {
     }
 
     ToolStripDropPanel {
-        id:         dropPanel
-        toolStrip:  _root
+        id:        dropPanel
+        toolStrip: _root
     }
 }

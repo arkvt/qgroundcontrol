@@ -191,7 +191,7 @@ Item {
                     id:                     uploadText
                     anchors.centerIn:       parent
                     text:                   uploadButton.text
-                    color:                  _controllerDirty ? qgcPal.primaryButtonText : qgcPal.text
+                    color:                  _controllerDirty ? "white" : qgcPal.text
                     font.pointSize:         ScreenTools.controlFontPointSize
                     horizontalAlignment:    Text.AlignHCenter
                     verticalAlignment:      Text.AlignVCenter

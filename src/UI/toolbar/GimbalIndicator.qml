@@ -142,7 +142,7 @@ Item {
                         anchors.horizontalCenter:   gimbalSelectorPanel.horizontalCenter
                         width:                      gimbalSelectorPanel.width
                         height:                     panelRadius * 2
-                        color:                      Qt.rgba(0.045, 0.048, 0.052, 0.96)
+                        color:                      Qt.rgba(0.045, 0.048, 0.052, 0.72)
                         visible:                    gimbalSelectorPanel.visible
                     }
                     
@@ -151,7 +151,7 @@ Item {
                         width:                      buttonHeight + margins * 2
                         height:                     gimbalSelectorContentGrid.childrenRect.height + margins * 2
                         visible:                    gimbalSelectorButton.checked
-                        color:                      Qt.rgba(0.045, 0.048, 0.052, 0.96)
+                        color:                      Qt.rgba(0.045, 0.048, 0.052, 0.72)
                         radius:                     panelRadius
                         // We only show border if the extended settings panel is visible
                         border.color:               settingsPanelVisible ? Qt.rgba(0.82, 0.88, 0.94, 0.14) : Qt.rgba(0.82, 0.88, 0.94, 0.08)

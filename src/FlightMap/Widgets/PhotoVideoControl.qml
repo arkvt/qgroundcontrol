@@ -23,14 +23,15 @@ import QGroundControl.FactSystem
 import QGroundControl.FactControls
 
 Rectangle {
+    id:         control
     width:      mainLayout.width + (_margins * 2)
     height:     mainLayout.height + (_margins * 2)
-    color:      Qt.rgba(0.045, 0.048, 0.052, 0.66)
+    color:      "transparent"
     radius:     _margins
-    border.color: Qt.rgba(0.82, 0.88, 0.94, 0.12)
-    border.width: 1
+    border.width: 0
     visible:    _camera.capturesVideo || _camera.capturesPhotos
 
+    property Item   backdropSourceItem
     property real   _margins:                   ScreenTools.defaultFontPixelHeight / 3
     property real   _smallMargins:              ScreenTools.defaultFontPixelWidth / 3
     property real   _recordButtonSize:          ScreenTools.defaultFontPixelHeight * 2.25
@@ -47,6 +48,21 @@ Rectangle {
     property bool   _photoCaptureIdle:          _photoCaptureSingleIdle || _photoCaptureIntervalIdle
 
     QGCPalette { id: qgcPal; colorGroupEnabled: enabled }
+
+    GlassBackdrop {
+        anchors.fill:       parent
+        sourceItem:         control.backdropSourceItem
+        targetItem:         control
+        cornerRadius:       control.radius
+    }
+
+    Rectangle {
+        anchors.fill:   parent
+        color:          "transparent"
+        radius:         control.radius
+        border.color:   Qt.rgba(0.82, 0.90, 0.95, 0.14)
+        border.width:   1
+    }
 
     DeadMouseArea { anchors.fill: parent }
 

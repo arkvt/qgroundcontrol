@@ -123,6 +123,7 @@ QGCFlickable {
                     QGCButton {
                         Layout.fillWidth:   true
                         text:               qsTr("Polygon Fence")
+                        glassStyle:         true
 
                         onClicked: {
                             var rect = Qt.rect(flightMap.centerViewport.x, flightMap.centerViewport.y, flightMap.centerViewport.width, flightMap.centerViewport.height)
@@ -135,6 +136,7 @@ QGCFlickable {
                     QGCButton {
                         Layout.fillWidth:   true
                         text:               qsTr("Circular Fence")
+                        glassStyle:         true
 
                         onClicked: {
                             var rect = Qt.rect(flightMap.centerViewport.x, flightMap.centerViewport.y, flightMap.centerViewport.width, flightMap.centerViewport.height)
@@ -214,6 +216,7 @@ QGCFlickable {
                             QGCButton {
                                 text:               qsTr("Del")
                                 Layout.alignment:   Qt.AlignHCenter
+                                glassStyle:         true
                                 onClicked:          myGeoFenceController.deletePolygon(index)
                             }
                         }
@@ -306,6 +309,7 @@ QGCFlickable {
                             QGCButton {
                                 text:               qsTr("Del")
                                 Layout.alignment:   Qt.AlignHCenter
+                                glassStyle:         true
                                 onClicked:          myGeoFenceController.deleteCircle(index)
                             }
                         }
@@ -320,6 +324,7 @@ QGCFlickable {
 
                     QGCButton {
                         text:               qsTr("Add Breach Return Point")
+                        glassStyle:         true
                         visible:            breachReturnSection.visible && !myGeoFenceController.breachReturnPoint.isValid
                         anchors.left:       parent.left
                         anchors.right:      parent.right
@@ -329,6 +334,7 @@ QGCFlickable {
 
                     QGCButton {
                         text:               qsTr("Remove Breach Return Point")
+                        glassStyle:         true
                         visible:            breachReturnSection.visible && myGeoFenceController.breachReturnPoint.isValid
                         anchors.left:       parent.left
                         anchors.right:      parent.right

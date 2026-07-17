@@ -35,6 +35,7 @@ Item {
     property var    parentToolInsets
     property var    totalToolInsets:        _totalToolInsets
     property var    mapControl
+    property Item   dialogBackdropSourceItem
     property bool   isViewer3DOpen:         false
 
     property var    _activeVehicle:         QGroundControl.multiVehicleManager.activeVehicle
@@ -125,6 +126,7 @@ Item {
         anchors.right:      parent.right
         spacing:            _layoutSpacing
         visible:           !topRightPanel.visible
+        backdropSourceItem: mapControl
 
         property real topEdgeRightInset:    childrenRect.height + _layoutMargin
         property real rightEdgeTopInset:    width + _layoutMargin
@@ -167,6 +169,7 @@ Item {
         z:                          QGroundControl.zOrderTopMost
         guidedController:           _guidedController
         guidedValueSlider:          _guidedValueSlider
+        backdropSourceItem:         mapControl
         utmspSliderTrigger:         utmspActTrigger
     }
 
@@ -247,6 +250,7 @@ Item {
     VehicleWarnings {
         anchors.centerIn:   parent
         z:                  QGroundControl.zOrderTopMost
+        backdropSourceItem: mapControl
     }
 
     MapScale {
@@ -271,6 +275,7 @@ Item {
     Component {
         id: preFlightChecklistPopup
         FlyViewPreFlightChecklistPopup {
+            backdropSourceItem: _root.dialogBackdropSourceItem
         }
     }
 }

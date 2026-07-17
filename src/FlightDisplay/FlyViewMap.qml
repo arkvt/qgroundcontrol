@@ -638,6 +638,7 @@ FlightMap {
 
         DropPanel {
             id: roiEditDropPanel
+            backdropSourceItem: _root
 
             sourceComponent: Component {
                 ColumnLayout {
@@ -645,6 +646,7 @@ FlightMap {
 
                     QGCButton {
                         Layout.fillWidth:   true
+                        glassStyle:         true
                         text:               qsTr("Cancel ROI")
                         onClicked: {
                             _activeVehicle.stopGuidedModeROI()
@@ -654,6 +656,7 @@ FlightMap {
 
                     QGCButton {
                         Layout.fillWidth:   true
+                        glassStyle:         true
                         text:               qsTr("Edit Position")
                         onClicked: {         
                             roiEditPositionDialogComponent.createObject(mainWindow, { showSetPositionFromVehicle: false }).open()
@@ -672,6 +675,7 @@ FlightMap {
             id: mapClickDropPanel
 
             property var mapClickCoord
+            backdropSourceItem: _root
 
             sourceComponent: Component {
                 ColumnLayout {
@@ -679,6 +683,7 @@ FlightMap {
 
                     QGCButton {
                         Layout.fillWidth:   true
+                        glassStyle:         true
                         text:               qsTr("Go to location")
                         visible:            globals.guidedControllerFlyView.showGotoLocation
                         onClicked: {
@@ -696,6 +701,7 @@ FlightMap {
 
                     QGCButton {
                         Layout.fillWidth:   true
+                        glassStyle:         true
                         text:               qsTr("Orbit at location")
                         visible:            globals.guidedControllerFlyView.showOrbit
                         onClicked: {
@@ -707,6 +713,7 @@ FlightMap {
 
                     QGCButton {
                         Layout.fillWidth:   true
+                        glassStyle:         true
                         text:               qsTr("ROI at location")
                         visible:            globals.guidedControllerFlyView.showROI
                         onClicked: {
@@ -717,6 +724,7 @@ FlightMap {
 
                     QGCButton {
                         Layout.fillWidth:   true
+                        glassStyle:         true
                         text:               qsTr("Set home here")
                         visible:            globals.guidedControllerFlyView.showSetHome
                         onClicked: {
@@ -727,6 +735,7 @@ FlightMap {
 
                     QGCButton {
                         Layout.fillWidth:   true
+                        glassStyle:         true
                         text:               qsTr("Set Estimator Origin")
                         visible:            globals.guidedControllerFlyView.showSetEstimatorOrigin
                         onClicked: {
@@ -737,6 +746,7 @@ FlightMap {
 
                     QGCButton {
                         Layout.fillWidth:   true
+                        glassStyle:         true
                         text:               qsTr("Set Heading")
                         visible:            globals.guidedControllerFlyView.showChangeHeading
                         onClicked: {

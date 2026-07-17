@@ -18,11 +18,13 @@ import QGroundControl.Palette
 
 /// Toolbar used for things like Polygon editing tools
 Item {
+    id:     root
     width:  Math.min(toolsRowLayout.width + (_margins * 2), availableWidth)
     height: toolsFlickable.y + toolsFlickable.height + _margins
     z:      QGroundControl.zOrderMapItems + 2
 
     property real availableWidth
+    property Item backdropSource
 
     property real _radius:  ScreenTools.defaultFontPixelWidth / 2
     property real _margins: ScreenTools.defaultFontPixelWidth / 2
@@ -40,11 +42,18 @@ Item {
         instructionComponent.createObject(toolsRowLayout)
     }
 
+    GlassBackdrop {
+        anchors.fill:       parent
+        sourceItem:         root.backdropSource
+        targetItem:         root
+        cornerRadius:       root._radius
+    }
+
     Rectangle {
-        anchors.fill:    parent
-        radius:         _radius
-        color:          Qt.rgba(0.045, 0.048, 0.052, 0.80)
-        border.color:   Qt.rgba(0.82, 0.88, 0.94, 0.055)
+        anchors.fill:   parent
+        radius:         root._radius
+        color:          "transparent"
+        border.color:   Qt.rgba(0.82, 0.90, 0.95, 0.14)
         border.width:   1
     }
 

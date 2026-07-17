@@ -7065,6 +7065,10 @@ Click Ok to start the auto-tuning process.
       <translation>空速</translation>
     </message>
     <message>
+      <source>Home AMSL</source>
+      <translation>Home海拔</translation>
+    </message>
+    <message>
       <source>Flight Time</source>
       <translation>飞行时间</translation>
     </message>

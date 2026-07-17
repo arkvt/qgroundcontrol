@@ -53,13 +53,14 @@ Rectangle {
         backdropBlurEnabled:true
         targetItem:         bottomStrip
         cornerRadius:       bottomStrip.radius
-        sourceScale:        0.42
-        blurAmount:         0.94
-        blurMax:            42
-        sourceBrightness:   -0.01
-        sourceSaturation:   0.62
-        tintColor:          Qt.rgba(0.045, 0.048, 0.052, 0.68)
-        sheenColor:         "transparent"
+    }
+
+    Rectangle {
+        anchors.fill:   parent
+        color:          "transparent"
+        radius:         bottomStrip.radius
+        border.color:   Qt.rgba(0.82, 0.90, 0.95, 0.14)
+        border.width:   1
     }
 
     FlyViewToolStripActionList {

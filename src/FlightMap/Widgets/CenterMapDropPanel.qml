@@ -31,6 +31,7 @@ ColumnLayout {
     QGCButton {
         text:               qsTr("Mission")
         Layout.fillWidth:   true
+        glassStyle:         true
         visible:            showMission
 
         onClicked: {
@@ -42,6 +43,7 @@ ColumnLayout {
     QGCButton {
         text:               qsTr("All items")
         Layout.fillWidth:   true
+        glassStyle:         true
         visible:            showAllItems
 
         onClicked: {
@@ -53,6 +55,7 @@ ColumnLayout {
     QGCButton {
         text:               qsTr("Launch")
         Layout.fillWidth:   true
+        glassStyle:         true
 
         onClicked: {
             dropPanel.hide()
@@ -63,6 +66,7 @@ ColumnLayout {
     QGCButton {
         text:               qsTr("Vehicle")
         Layout.fillWidth:   true
+        glassStyle:         true
         enabled:            globals.activeVehicle && globals.activeVehicle.coordinate.isValid
 
         onClicked: {
@@ -74,6 +78,7 @@ ColumnLayout {
     QGCButton {
         text:               qsTr("Current Location")
         Layout.fillWidth:   true
+        glassStyle:         true
         enabled:            map.gcsPosition.isValid
 
         onClicked: {
@@ -85,6 +90,7 @@ ColumnLayout {
     QGCButton {
         text:               qsTr("Specified Location")
         Layout.fillWidth:   true
+        glassStyle:         true
 
         onClicked: {
             dropPanel.hide()

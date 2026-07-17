@@ -45,6 +45,7 @@ Popup {
     height: mainWindow.height
     parent:             Overlay.overlay
     modal:              true
+    dim:                !glassStyle
     focus:              true
     margins:            0
 
@@ -55,6 +56,8 @@ Popup {
     property var    dialogProperties
     property bool   destroyOnClose:         true
     property bool   preventClose:           false
+    property bool   glassStyle:             false
+    property Item   backdropSourceItem:     null
     
     readonly property real headerMinWidth: titleLable.implicitWidth + rejectButton.width + acceptButton.width + titleRowLayout.spacing * 2
 
@@ -68,6 +71,7 @@ Popup {
     property bool   _acceptAllowed:     acceptButton.visible
     property bool   _rejectAllowed:     rejectButton.visible
     property int    _previousValidationErrorCount: 0
+    property int    _backdropSampleRevision: 0
 
     background: QGCMouseArea {
         width:  mainWindow.width
@@ -75,7 +79,7 @@ Popup {
 
         Rectangle {
             anchors.fill: parent
-            color:        Qt.rgba(0, 0, 0, 0.36)
+            color:        root.glassStyle ? "transparent" : Qt.rgba(0, 0, 0, 0.36)
         }
 
         onClicked: {
@@ -94,7 +98,10 @@ Popup {
     onAboutToShow: {
         _previousValidationErrorCount = globals.validationErrorCount
         setupDialogButtons(buttons)
+        _backdropSampleRevision++
     }
+
+    onOpened: _backdropSampleRevision++
 
     onClosed: {
         globals.validationErrorCount = _previousValidationErrorCount
@@ -199,15 +206,49 @@ Popup {
         acceptButton.enabled = false
     }
 
-    Rectangle {
+    Item {
+        id:             dialogSurface
         x:              mainLayout.x - _contentMargin
         y:              mainLayout.y - _contentMargin
         width:          mainLayout.width + _contentMargin * 2
         height:         mainLayout.height + _contentMargin * 2
-        color:          Qt.rgba(0.045, 0.048, 0.052, 0.96)
-        radius:         _dialogRadius
-        border.width:   1
-        border.color:   Qt.rgba(0.82, 0.88, 0.94, 0.14)
+        clip:           root.glassStyle
+
+        readonly property point backdropSamplePoint: {
+            root._backdropSampleRevision
+            root.x
+            root.y
+            dialogSurface.x
+            dialogSurface.y
+            mainLayout.x
+            mainLayout.y
+            return root.backdropSourceItem
+                    ? dialogSurface.mapToItem(root.backdropSourceItem, 0, 0)
+                    : Qt.point(0, 0)
+        }
+
+        GlassBackdrop {
+            anchors.fill:        parent
+            visible:             root.glassStyle && !!root.backdropSourceItem
+            sourceItem:          root.backdropSourceItem
+            targetItem:          dialogSurface
+            sampleAtItemPosition: false
+            sampleX:             dialogSurface.backdropSamplePoint.x
+            sampleY:             dialogSurface.backdropSamplePoint.y
+            backdropBlurEnabled: visible
+            cornerRadius:        root._dialogRadius
+            sourcePadding:       56
+        }
+
+        Rectangle {
+            anchors.fill: parent
+            color:        root.glassStyle
+                              ? (root.backdropSourceItem ? "transparent" : Qt.rgba(0.045, 0.048, 0.052, 0.92))
+                              : Qt.rgba(0.045, 0.048, 0.052, 0.96)
+            radius:       root._dialogRadius
+            border.width: 1
+            border.color: Qt.rgba(0.82, 0.88, 0.94, 0.14)
+        }
     }
 
     ColumnLayout {
@@ -232,6 +273,7 @@ Popup {
 
             QGCButton {
                 id:                     rejectButton
+                glassStyle:             root.glassStyle
                 onClicked:              _reject()
                 Layout.minimumWidth:    height * 1.5
             }
@@ -248,7 +290,7 @@ Popup {
             Layout.fillWidth:       true
             Layout.preferredWidth:  Math.min(maxAvailableWidth, totalContentWidth)
             Layout.preferredHeight: Math.min(maxAvailableHeight, totalContentHeight)
-            color:                  Qt.rgba(1, 1, 1, 0.025)
+            color:                  root.glassStyle ? "transparent" : Qt.rgba(1, 1, 1, 0.025)
             radius:                 Math.round(_dialogRadius * 0.65)
             clip:                   true
 

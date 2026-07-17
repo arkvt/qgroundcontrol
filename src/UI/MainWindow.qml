@@ -712,13 +712,27 @@ ApplicationWindow {
         }
 
         background: Item {
-            Rectangle {
+            Item {
                 id:             backgroundRect
                 anchors.fill:   parent
-                color:          Qt.rgba(0.045, 0.048, 0.052, 0.96)
-                radius:         Math.round(ScreenTools.defaultFontPixelWidth * 0.85)
-                border.color:   Qt.rgba(0.82, 0.88, 0.94, 0.14)
-                border.width:   1
+                clip:           true
+
+                readonly property real surfaceRadius: Math.round(ScreenTools.defaultFontPixelWidth * 0.85)
+
+                GlassBackdrop {
+                    anchors.fill:       parent
+                    sourceItem:         toolDrawer.visible ? toolDrawer : (planView.visible ? planView : flyView)
+                    targetItem:         backgroundRect
+                    cornerRadius:       backgroundRect.surfaceRadius
+                }
+
+                Rectangle {
+                    anchors.fill:   parent
+                    color:          "transparent"
+                    radius:         backgroundRect.surfaceRadius
+                    border.color:   Qt.rgba(0.82, 0.90, 0.95, 0.14)
+                    border.width:   1
+                }
             }
 
             Rectangle {

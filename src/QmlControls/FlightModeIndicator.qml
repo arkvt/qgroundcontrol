@@ -168,6 +168,7 @@ RowLayout {
                         id:                 modeButton
                         text:               modelData
                         Layout.fillWidth:   true
+                        glassStyle:         true
 
                         onClicked: {
                             if (editMode) {

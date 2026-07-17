@@ -12,7 +12,6 @@ import QtQuick.Controls
 import QtQuick.Dialogs
 import QtLocation
 import QtPositioning
-import QtQuick.Shapes
 
 import QGroundControl
 import QGroundControl.Controls
@@ -61,7 +60,6 @@ Item {
                                                 ? qsTr("Loiter descent point must remain on the fixed CLND_TAN_DIST constraint.")
                                                 : ""
     readonly property var tangentCoordinate: _calculateTangentCoordinate()
-    readonly property var directionArrowCoordinate: _circleCoordinate(0)
     readonly property var airbrakeLabelCoordinate: landingCoordinateValid && airbrakeRadiusMeters > 0
                                                         ? controller.landingCoordinate.atDistanceAndAzimuth(
                                                               airbrakeRadiusMeters, 0)
@@ -189,7 +187,6 @@ Item {
             entryLoiterCircleComponent,
             loiterCircleComponent,
             returnLineComponent,
-            directionArrowComponent,
             airbrakeCircleComponent,
             airbrakeLabelComponent,
             approachLineComponent,
@@ -486,41 +483,6 @@ Item {
             opacity: _root.routePathOpacity
             path: _root.returnPath
             visible: _root.active && _root.returnPath.length === 2
-        }
-    }
-
-    Component {
-        id: directionArrowComponent
-
-        MapQuickItem {
-            z: QGroundControl.zOrderMapItems
-            coordinate: _root.directionArrowCoordinate
-            anchorPoint.x: sourceItem.width / 2
-            anchorPoint.y: sourceItem.height / 2
-            visible: _root.active && _root.loiterCoordinateValid && _root.loiterRadiusMeters > 0
-
-            sourceItem: Shape {
-                width: Math.max(16, ScreenTools.defaultFontPixelHeight * 0.95)
-                height: width * 0.68
-
-                transform: Rotation {
-                    origin.x: width / 2
-                    origin.y: height / 2
-                    angle: (_root.controller && _root.controller.clockwise ? 180 : 0)
-                           - (_root.map && isFinite(Number(_root.map.bearing)) ? Number(_root.map.bearing) : 0)
-                }
-
-                ShapePath {
-                    strokeWidth: 0
-                    strokeColor: "transparent"
-                    fillColor: QGroundControl.globalPalette.mapMissionTrajectory
-                    startX: 0
-                    startY: height / 2
-                    PathLine { x: width; y: height }
-                    PathLine { x: width; y: 0 }
-                    PathLine { x: 0; y: height / 2 }
-                }
-            }
         }
     }
 

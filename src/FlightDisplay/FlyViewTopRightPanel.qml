@@ -74,13 +74,14 @@ Rectangle {
         backdropBlurEnabled:true
         targetItem:         topRightPanel
         cornerRadius:       topRightPanel.radius
-        sourceScale:        0.46
-        blurAmount:         0.94
-        blurMax:            42
-        sourceBrightness:   -0.01
-        sourceSaturation:   0.62
-        tintColor:          Qt.rgba(0.045, 0.048, 0.052, 0.78)
-        sheenColor:         "transparent"
+    }
+
+    Rectangle {
+        anchors.fill:   parent
+        color:          "transparent"
+        radius:         topRightPanel.radius
+        border.color:   Qt.rgba(0.82, 0.90, 0.95, 0.14)
+        border.width:   1
     }
 
     function factText(fact, fallbackText) {
@@ -120,6 +121,15 @@ Rectangle {
 
         var altitudeMeters = Number(vehicle.altitudeAMSL.rawValue) - Number(gcsAltitude)
         var displayAltitude = QGroundControl.unitsConversion.metersToAppSettingsVerticalDistanceUnits(altitudeMeters)
+        return Number(displayAltitude).toFixed(1) + " " + QGroundControl.unitsConversion.appSettingsVerticalDistanceUnitsString
+    }
+
+    function homeAltitudeText(vehicle, fallbackText) {
+        if (!vehicle || !vehicle.homePosition.isValid || isNaN(vehicle.homePosition.altitude)) {
+            return fallbackText
+        }
+
+        var displayAltitude = QGroundControl.unitsConversion.metersToAppSettingsVerticalDistanceUnits(vehicle.homePosition.altitude)
         return Number(displayAltitude).toFixed(1) + " " + QGroundControl.unitsConversion.appSettingsVerticalDistanceUnitsString
     }
 
@@ -1024,7 +1034,7 @@ Rectangle {
                                              ScreenTools.defaultFontPixelHeight * 9.2)
                 visible:            _vehicleMenuOpen && vehicles && vehicles.count > 1
                 radius:             Math.round(ScreenTools.defaultFontPixelWidth * 0.44)
-                color:              Qt.rgba(0.045, 0.048, 0.052, 1.0)
+                color:              Qt.rgba(0.045, 0.048, 0.052, 0.82)
                 border.color:       Qt.rgba(0.82, 0.90, 0.95, 0.16)
                 border.width:       1
                 clip:               true
@@ -1196,6 +1206,24 @@ Rectangle {
                         numericValue:   factRawValue(_activeVehicle ? _activeVehicle.altitudeRelative : null)
                         stepValue:      25
                         leftScale:      true
+                    }
+
+                    QGCLabel {
+                        anchors.top:                altitudeTape.bottom
+                        anchors.topMargin:          Math.max(2, ScreenTools.defaultFontPixelHeight * 0.12)
+                        x:                          altitudeTape.x + altitudeTape.rulerCenterX() - (width / 2)
+                        width:                      altitudeTape.width
+                        text:                       qsTr("Home AMSL") + " " + homeAltitudeText(_activeVehicle, qsTr("N/A"))
+                        color:                      qgcPal.buttonText
+                        opacity:                    0.86
+                        font.family:                _panelFontFamily
+                        font.pointSize:             Math.max(7, ScreenTools.captionFontPointSize - 1)
+                        horizontalAlignment:        Text.AlignHCenter
+                        verticalAlignment:          Text.AlignVCenter
+                        fontSizeMode:               Text.HorizontalFit
+                        minimumPointSize:           7
+                        elide:                      Text.ElideNone
+                        maximumLineCount:           1
                     }
 
                     Item {

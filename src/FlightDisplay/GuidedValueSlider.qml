@@ -22,6 +22,7 @@ Item {
     id:     control
     width:  indicatorCanvas.width
     clip:   true
+    property var backdropSourceItem
 
     enum SliderType {
         Altitude,
@@ -115,9 +116,11 @@ Item {
         anchors.fill:   parent
     }
 
-    Rectangle {
+    GlassBackdrop {
         anchors.fill:   parent
-        color:          Qt.rgba(0.045, 0.048, 0.052, 0.62)
+        sourceItem:     control.backdropSourceItem
+        targetItem:     control
+        backdropBlurEnabled: control.visible && !!control.backdropSourceItem
     }
 
     ColumnLayout {
@@ -234,7 +237,7 @@ Item {
         onPaint: {
             var ctx = getContext("2d")
             ctx.strokeStyle = _qgcPal.text
-            ctx.fillStyle = Qt.rgba(0.045, 0.048, 0.052, 0.88)
+            ctx.fillStyle = Qt.rgba(0.045, 0.048, 0.052, 0.74)
             ctx.lineWidth = 1
             ctx.beginPath()
             ctx.moveTo(0, indicatorHeight / 2)

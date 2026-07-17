@@ -93,6 +93,7 @@ PreFlightCheckButton {
 
         QGCButton {
             id:                     sendButton
+            glassStyle:             true
             Layout.alignment:       Qt.AlignRight | Qt.AlignVCenter
             Layout.rightMargin:     ScreenTools.defaultFontPixelWidth * 0.75
             Layout.minimumWidth:    root._sendButtonWidth
