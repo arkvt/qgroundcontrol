@@ -31,9 +31,9 @@ Item {
     property bool   _itemVisualShowing: false
     property bool   _dragAreaShowing:   false
 
-    readonly property int   _loiterPathWidth:   40
+    readonly property int   _loiterPathWidth:   32
     readonly property color _loiterPathColor:   "#ffd400"
-    readonly property real  _loiterPathOpacity: 0.55
+    readonly property real  _loiterPathOpacity: 0.40
 
     signal clicked(int sequenceNumber)
 
