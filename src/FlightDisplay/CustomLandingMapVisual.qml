@@ -75,9 +75,9 @@ Item {
                                       ? [returnStartCoordinate, returnCircleEntryCoordinate]
                                       : []
 
-    readonly property int   loiterPathWidth:   40
+    readonly property int   loiterPathWidth:   32
     readonly property color loiterPathColor:   "#ffd400"
-    readonly property real  loiterPathOpacity: 0.55
+    readonly property real  loiterPathOpacity: 0.40
 
     property var _mapClickArea
     property var _loiterMarker
@@ -491,9 +491,9 @@ Item {
 
         MapPolyline {
             z: QGroundControl.zOrderMapItems - 1
-            line.color: _root.routePathColor
-            line.width: _root.routePathWidth
-            opacity: _root.routePathOpacity
+            line.color: _root.loiterPathColor
+            line.width: _root.loiterPathWidth
+            opacity: _root.loiterPathOpacity
             path: _root.approachPath
             visible: _root.active && _root.geometryValid
         }
