@@ -3310,8 +3310,13 @@ bool Vehicle::startFlightCheckActuatorTest(int testId)
     const bool fixedWingThrottleTest = testId == kFixedWingThrottle;
     const bool motorTest = testId >= kFirstMotor && testId <= kLastMotor;
 
+    // All actuator tests are a ground-only preflight step. A control-surface
+    // test forces FBWA and injects a manual-control pulse; if it ran while
+    // airborne (armed) it would disturb the flight, so require disarmed here
+    // just like the throttle and motor tests already do.
     if ((!controlSurfaceTest && !fixedWingThrottleTest && !motorTest) ||
         _flightCheckCommandPending ||
+        (controlSurfaceTest && armed()) ||
         (fixedWingThrottleTest && armed()) ||
         (motorTest && armed())) {
         return false;

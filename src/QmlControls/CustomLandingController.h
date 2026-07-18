@@ -184,7 +184,7 @@ private:
     /// CRC-16/CCITT-FALSE: poly 0x1021, init 0xFFFF, refin/refout false,
     /// xorout 0x0000.
     struct PlanSnapshot {
-        quint8 version = 1;
+        quint8 version = 2; // keep in sync with kProtocolVersion; _snapshotDraft() always overwrites this
         quint8 loiterFrame = 0;
         quint8 landingFrame = 0;
         quint8 flags = 0;

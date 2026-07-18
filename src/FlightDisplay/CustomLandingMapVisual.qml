@@ -573,7 +573,7 @@ Item {
                 label: qsTr("Loiter descent") + "  +"
                        + Number(_root.controller.loiterHeightAboveLanding).toFixed(1) + " " + qsTr("m")
                 checked: _root._selectedMarker === 2
-                trailingActionVisible: _root.controller && _root.controller.planCommitted
+                trailingActionVisible: _root.controller && _root.controller.planCommitted && !_root.readOnly
                 trailingActionIconSource: "/res/cancel.svg"
                 trailingActionToolTip: qsTranslate("CustomLandingPanel", "Abort landing")
                 onClicked: _root._selectedMarker = _root._selectedMarker === 2 ? 0 : 2
@@ -602,7 +602,7 @@ Item {
                               ? Number(_root.controller.landingElevation).toFixed(1) + " " + qsTr("m AMSL")
                               : qsTr("Not set"))
                 checked: _root._selectedMarker === 1
-                trailingActionVisible: _root.controller && _root.controller.planCommitted
+                trailingActionVisible: _root.controller && _root.controller.planCommitted && !_root.readOnly
                 trailingActionIconSource: "/res/cancel.svg"
                 trailingActionToolTip: qsTranslate("CustomLandingPanel", "Abort landing")
                 onClicked: _root._selectedMarker = _root._selectedMarker === 1 ? 0 : 1
