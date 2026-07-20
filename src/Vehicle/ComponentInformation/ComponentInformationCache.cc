@@ -81,10 +81,18 @@ QString ComponentInformationCache::insert(const QString &fileTag, const QString 
     QFile meta(metaFileName(fileTag));
     QFile data(dataFileName(fileTag));
     QFile fileToCache(fileName);
-    if (meta.exists() || data.exists()) {
+    if (meta.exists() && data.exists()) {
         qCDebug(ComponentInformationCacheLog) << "Not inserting, entry already exists" << fileTag;
         fileToCache.remove();
         return data.fileName();
+    }
+
+    // A previous interrupted write or a failed cleanup on Windows can leave
+    // only one half of a cache entry. Remove the orphan before inserting the
+    // replacement instead of treating it as a valid cache hit.
+    if ((meta.exists() && !meta.remove()) || (data.exists() && !data.remove())) {
+        qCWarning(ComponentInformationCacheLog) << "Failed to remove incomplete cache entry" << fileTag;
+        return "";
     }
 
     // move the file to the cache location
@@ -169,7 +177,13 @@ void ComponentInformationCache::initializeDirectory()
                 }
             }
 
-        } else if (!path.endsWith(_cacheExtension)) {
+        } else if (path.endsWith(_cacheExtension)) {
+            QFile meta(path.left(path.length() - strlen(_cacheExtension)) + _metaExtension);
+            if (!meta.exists()) {
+                qCWarning(ComponentInformationCacheLog) << "Removing orphaned cache data file" << path;
+                QFile::remove(path);
+            }
+        } else {
             QFile::remove(path);
         }
     }

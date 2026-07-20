@@ -57,19 +57,45 @@ SettingsPage {
             id: nmeaPortCombo
             label: qsTr("Device")
 
+            readonly property string disabledSettingValue: "Disabled"
+            readonly property string udpSettingValue:      "UDP Port"
+            readonly property string disabledDisplayText:  qsTr("Disabled")
+            readonly property string udpDisplayText:       qsTr("UDP Port")
+
             model: ListModel {}
+
+            function settingValueForDisplayText(displayText) {
+                if (displayText === disabledDisplayText) {
+                    return disabledSettingValue
+                }
+                if (displayText === udpDisplayText) {
+                    return udpSettingValue
+                }
+                return displayText
+            }
+
+            function displayTextForSettingValue(settingValue) {
+                if (settingValue === disabledSettingValue) {
+                    return disabledDisplayText
+                }
+                if (settingValue === udpSettingValue) {
+                    return udpDisplayText
+                }
+                return settingValue
+            }
 
             onActivated: (index) => {
                 if (index !== -1) {
-                    QGroundControl.settingsManager.autoConnectSettings.autoConnectNmeaPort.value = comboBox.textAt(index);
+                    const displayText = comboBox.textAt(index)
+                    QGroundControl.settingsManager.autoConnectSettings.autoConnectNmeaPort.value = settingValueForDisplayText(displayText)
                 }
             }
 
             Component.onCompleted: {
                 var model = []
 
-                model.push(qsTr("Disabled"))
-                model.push(qsTr("UDP Port"))
+                model.push(disabledDisplayText)
+                model.push(udpDisplayText)
 
                 if (QGroundControl.linkManager.serialPorts.length === 0) {
                     model.push(qsTr("Serial <none available>"))
@@ -80,14 +106,20 @@ SettingsPage {
                 }
                 nmeaPortCombo.model = model
 
-                const index = nmeaPortCombo.comboBox.find(QGroundControl.settingsManager.autoConnectSettings.autoConnectNmeaPort.valueString);
-                nmeaPortCombo.currentIndex = index;
+                const settingsFact = QGroundControl.settingsManager.autoConnectSettings.autoConnectNmeaPort
+                const settingValue = settingValueForDisplayText(settingsFact.valueString)
+                if (settingValue !== settingsFact.valueString) {
+                    settingsFact.value = settingValue
+                }
+
+                const index = nmeaPortCombo.comboBox.find(displayTextForSettingValue(settingValue))
+                nmeaPortCombo.currentIndex = index
             }
         }
 
         LabelledComboBox {
             id: nmeaBaudCombo
-            visible: (nmeaPortCombo.currentText !== "UDP Port") && (nmeaPortCombo.currentText !== "Disabled")
+            visible: (nmeaPortCombo.currentText !== nmeaPortCombo.udpDisplayText) && (nmeaPortCombo.currentText !== nmeaPortCombo.disabledDisplayText)
             label: qsTr("Baudrate")
             model: QGroundControl.linkManager.serialBaudRates
 
@@ -104,7 +136,7 @@ SettingsPage {
         }
 
         LabelledFactTextField {
-            visible: nmeaPortCombo.currentText === "UDP Port"
+            visible: nmeaPortCombo.currentText === nmeaPortCombo.udpDisplayText
             label: qsTr("NMEA stream UDP port")
             fact: QGroundControl.settingsManager.autoConnectSettings.nmeaUdpPort
         }

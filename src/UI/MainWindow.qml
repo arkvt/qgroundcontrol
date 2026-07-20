@@ -27,6 +27,7 @@ import QGroundControl.UTMSP
 /// All properties defined here are visible to all QML pages.
 ApplicationWindow {
     id:             mainWindow
+    title:          "中科华控地面站"
     visible:        true
 
     property bool   _utmspSendActTrigger

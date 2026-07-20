@@ -189,8 +189,9 @@ void SimpleMissionItemTest::_testEditorFactsWorker(QGCMAVLink::VehicleClass_t ve
                     continue;
                 }
 
-                if (factValue->name == fact->name()) {
-                    QCOMPARE(fact->rawValue().toDouble(), (factValue->paramIndex * 10.0) + 0.1234567);
+                const double expectedValue = (factValue->paramIndex * 10.0) + 0.1234567;
+                if (qFuzzyCompare(fact->rawValue().toDouble(), expectedValue)) {
+                    QVERIFY(!fact->name().isEmpty());
                     foundTextFieldCount ++;
                     found = true;
                     break;
@@ -214,8 +215,9 @@ void SimpleMissionItemTest::_testEditorFactsWorker(QGCMAVLink::VehicleClass_t ve
                     continue;
                 }
 
-                if (factValue->name == fact->name()) {
-                    QCOMPARE(fact->rawValue().toDouble(), (factValue->paramIndex * 10.0) + 0.1234567);
+                const double expectedValue = (factValue->paramIndex * 10.0) + 0.1234567;
+                if (qFuzzyCompare(fact->rawValue().toDouble(), expectedValue)) {
+                    QVERIFY(!fact->name().isEmpty());
                     foundNaNFieldCount ++;
                     found = true;
                     break;

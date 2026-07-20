@@ -71,6 +71,25 @@ void ComponentInformationCacheTest::_basic_test()
     QVERIFY(f.open(QFile::ReadOnly | QFile::Text));
     QTextStream in(&f);
     QVERIFY(in.readAll() == _tmpFiles[0].content);
+    f.close();
+
+    _cleanup();
+}
+
+void ComponentInformationCacheTest::_orphan_test()
+{
+    _setup();
+    ComponentInformationCache cache(_cacheDir, 10);
+
+    const QString orphanPath = QDir(_cacheDir).filePath(_tmpFiles[0].cacheTag + ".cache");
+    QFile orphan(orphanPath);
+    QVERIFY(orphan.open(QIODevice::WriteOnly));
+    QCOMPARE(orphan.write("stale"), qint64{5});
+    orphan.close();
+
+    _tmpFiles[0].cachedPath = cache.insert(_tmpFiles[0].cacheTag, _tmpFiles[0].path);
+    QVERIFY(!_tmpFiles[0].cachedPath.isEmpty());
+    QCOMPARE(cache.access(_tmpFiles[0].cacheTag), _tmpFiles[0].cachedPath);
 
     _cleanup();
 }

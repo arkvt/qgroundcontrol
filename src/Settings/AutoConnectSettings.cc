@@ -10,6 +10,8 @@
 #include "AutoConnectSettings.h"
 #include "LinkManager.h"
 
+#include <QtCore/QCoreApplication>
+#include <QtCore/QSettings>
 #include <QtQml/QQmlEngine>
 
 DECLARE_SETTINGGROUP(AutoConnect, "AutoConnect")
@@ -35,6 +37,20 @@ DECLARE_SETTINGGROUP(AutoConnect, "AutoConnect")
         }
         settings.endGroup();
     }
+
+    // NMEA device choices are translated for display in QML, but the stored
+    // values are protocol identifiers consumed by LinkManager. Migrate values
+    // saved by older builds which persisted the translated display text.
+    settings.beginGroup(_name);
+    const QString nmeaPortValue = settings.value(QStringLiteral("autoConnectNmeaPort")).toString();
+    const QString translatedDisabled = QCoreApplication::translate("LinkSettings", "Disabled");
+    const QString translatedUdpPort = QCoreApplication::translate("LinkSettings", "UDP Port");
+    if ((nmeaPortValue == translatedDisabled) && (nmeaPortValue != QStringLiteral("Disabled"))) {
+        settings.setValue(QStringLiteral("autoConnectNmeaPort"), QStringLiteral("Disabled"));
+    } else if ((nmeaPortValue == translatedUdpPort) && (nmeaPortValue != QStringLiteral("UDP Port"))) {
+        settings.setValue(QStringLiteral("autoConnectNmeaPort"), QStringLiteral("UDP Port"));
+    }
+    settings.endGroup();
 }
 
 DECLARE_SETTINGSFACT(AutoConnectSettings, autoConnectUDP)

@@ -88,6 +88,13 @@ bool QmlObjectListModel::setData(const QModelIndex& index, const QVariant& value
 bool QmlObjectListModel::insertRows(int position, int rows, const QModelIndex& parent)
 {
     Q_UNUSED(parent);
+
+    if (rows <= 0) {
+        if (rows < 0) {
+            qCWarning(QmlObjectListModelLog) << "Invalid row count" << rows << this;
+        }
+        return rows == 0;
+    }
     
     if (position < 0 || position > _objectList.count() + 1) {
         qCWarning(QmlObjectListModelLog) << "Invalid position - position:count" << position << _objectList.count() << this;
@@ -104,6 +111,13 @@ bool QmlObjectListModel::insertRows(int position, int rows, const QModelIndex& p
 bool QmlObjectListModel::removeRows(int position, int rows, const QModelIndex& parent)
 {
     Q_UNUSED(parent);
+
+    if (rows <= 0) {
+        if (rows < 0) {
+            qCWarning(QmlObjectListModelLog) << "Invalid row count" << rows << this;
+        }
+        return rows == 0;
+    }
     
     if (position < 0 || position >= _objectList.count()) {
         qCWarning(QmlObjectListModelLog) << "Invalid position - position:count" << position << _objectList.count() << this;
@@ -198,6 +212,10 @@ void QmlObjectListModel::insert(int i, QObject* object)
 
 void QmlObjectListModel::insert(int i, QList<QObject*> objects)
 {
+    if (objects.isEmpty()) {
+        return;
+    }
+
     if (i < 0 || i > _objectList.count()) {
         qCWarning(QmlObjectListModelLog) << "Invalid index - index:count" << i << _objectList.count() << this;
     }

@@ -24,6 +24,7 @@ public:
 
 private slots:
     void _basic_test();
+    void _orphan_test();
     void _lru_test();
     void _multi_test();
 private:
