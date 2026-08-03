@@ -40,6 +40,7 @@ private slots:
 
 private:
     static void _initDataFromResources();
+    QByteArray _applyMapSaturation(const QByteArray &imageData, const QString &format) const;
 
     QNetworkAccessManager *_networkManager = nullptr;
     QNetworkRequest _request;

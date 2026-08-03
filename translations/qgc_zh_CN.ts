@@ -18791,4 +18791,13 @@ Confirm change?</translation>
     <message><source>cancel</source><translation>取消</translation></message>
     <message><source>command</source><translation>命令</translation></message>
   </context>
+  <context>
+    <name>MapSettings</name>
+    <message><source>Map color saturation</source><translation>地图色彩饱和度</translation></message>
+    <message><source>Grayscale</source><translation>灰度</translation></message>
+    <message><source>Muted</source><translation>低饱和</translation></message>
+    <message><source>Soft</source><translation>柔和</translation></message>
+    <message><source>Normal</source><translation>标准</translation></message>
+    <message><source>Vivid</source><translation>鲜艳</translation></message>
+  </context>
 </TS>

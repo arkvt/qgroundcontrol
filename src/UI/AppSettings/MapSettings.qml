@@ -34,6 +34,7 @@ Item {
 
     property Fact   _mapProviderFact:   _settingsManager.flightMapSettings.mapProvider
     property Fact   _mapTypeFact:       _settingsManager.flightMapSettings.mapType
+    property Fact   _mapSaturationFact: _settingsManager.flightMapSettings.mapSaturation
     property Fact   _elevationProviderFact: _settingsManager.flightMapSettings.elevationMapProvider
     property Fact   _mapboxFact:        _settingsManager ? _settingsManager.appSettings.mapboxToken : null
     property Fact   _mapboxAccountFact: _settingsManager ? _settingsManager.appSettings.mapboxAccount : null
@@ -41,6 +42,29 @@ Item {
     property Fact   _esriFact:          _settingsManager ? _settingsManager.appSettings.esriToken : null
     property Fact   _customURLFact:     _settingsManager ? _settingsManager.appSettings.customURL : null
     property Fact   _vworldFact:        _settingsManager ? _settingsManager.appSettings.vworldToken : null
+
+    readonly property var _mapSaturationValues: [0, 40, 70, 100, 130]
+
+    function _mapSaturationIndex(value) {
+        var numericValue = Number(value)
+        var bestIndex = 0
+        var bestDistance = Number.MAX_VALUE
+        for (var i = 0; i < _mapSaturationValues.length; i++) {
+            var distance = Math.abs(numericValue - _mapSaturationValues[i])
+            if (distance < bestDistance) {
+                bestDistance = distance
+                bestIndex = i
+            }
+        }
+        return bestIndex
+    }
+
+    Connections {
+        target: _mapSaturationFact
+        function onRawValueChanged() {
+            mapSaturationCombo.currentIndex = root._mapSaturationIndex(_mapSaturationFact.rawValue)
+        }
+    }
 
     SettingsPage {
         id:           settingsPage
@@ -84,6 +108,27 @@ Item {
                     var index = comboBox.find(_mapTypeFact.rawValue)
                     if (index < 0) index = 0
                     comboBox.currentIndex = index
+                }
+            }
+
+            LabelledComboBox {
+                id: mapSaturationCombo
+
+                label: qsTr("Map color saturation")
+                model: [
+                    qsTr("Grayscale") + " (0%)",
+                    qsTr("Muted") + " (40%)",
+                    qsTr("Soft") + " (70%)",
+                    qsTr("Normal") + " (100%)",
+                    qsTr("Vivid") + " (130%)"
+                ]
+
+                onActivated: (index) => {
+                    _mapSaturationFact.rawValue = root._mapSaturationValues[index]
+                }
+
+                Component.onCompleted: {
+                    currentIndex = root._mapSaturationIndex(_mapSaturationFact.rawValue)
                 }
             }
 

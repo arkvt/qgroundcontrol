@@ -10548,6 +10548,12 @@ Click Ok to start the auto-tuning process.
       <source>Type</source>
       <translation>类型</translation>
     </message>
+    <message><source>Map color saturation</source><translation>地图色彩饱和度</translation></message>
+    <message><source>Grayscale</source><translation>灰度</translation></message>
+    <message><source>Muted</source><translation>低饱和</translation></message>
+    <message><source>Soft</source><translation>柔和</translation></message>
+    <message><source>Normal</source><translation>标准</translation></message>
+    <message><source>Vivid</source><translation>鲜艳</translation></message>
     <message>
       <location filename="../src/UI/AppSettings/MapSettings.qml" line="91"/>
       <source>Elevation Provider</source>

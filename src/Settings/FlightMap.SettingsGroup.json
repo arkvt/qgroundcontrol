@@ -16,6 +16,14 @@
     "default":     "Hybrid"
 },
 {
+    "name":      "mapSaturation",
+    "shortDesc": "Color saturation applied to flight map tiles",
+    "type":      "uint32",
+    "min":       0,
+    "max":       150,
+    "default":   100
+},
+{
     "name":      "elevationMapProvider",
     "shortDesc": "Currently selected elevation map provider",
     "type":      "string",

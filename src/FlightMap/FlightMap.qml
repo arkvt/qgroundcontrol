@@ -118,6 +118,19 @@ Map {
         function onRawValueChanged() { updateActiveMapType() }
     }
 
+    Connections {
+        target: QGroundControl.settingsManager.flightMapSettings.mapSaturation
+        function onRawValueChanged() {
+            if (_map.mapReady) {
+                // Tile saturation is applied by the QGC tile reply. Drop the
+                // rendered tile data so visible tiles are requested again;
+                // map items and operator overlays remain untouched.
+                _map.clearData()
+                _map.prefetchData()
+            }
+        }
+    }
+
     signal mapPanStart
     signal mapPanStop
     signal mapClicked(var position)

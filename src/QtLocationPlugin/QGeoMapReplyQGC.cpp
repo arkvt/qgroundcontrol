@@ -10,16 +10,21 @@
 #include "QGeoMapReplyQGC.h"
 
 #include "ElevationMapProvider.h"
+#include "Fact.h"
+#include "FlightMapSettings.h"
 #include "MapProvider.h"
 #include "QGCMapEngine.h"
 #include "QGCMapUrlEngine.h"
 #include "QGeoFileTileCacheQGC.h"
+#include "SettingsManager.h"
 
 #include <DeviceInfo.h>
 #include <QGCFileDownload.h>
 #include <QGCLoggingCategory.h>
 
+#include <QtCore/QBuffer>
 #include <QtCore/QFile>
+#include <QtGui/QImage>
 #include <QtLocation/private/qgeotilespec_p.h>
 #include <QtNetwork/QNetworkAccessManager>
 #include <QtNetwork/QSslError>
@@ -28,6 +33,48 @@ QGC_LOGGING_CATEGORY(QGeoTiledMapReplyQGCLog, "qgc.qtlocationplugin.qgeomapreply
 
 QByteArray QGeoTiledMapReplyQGC::_bingNoTileImage;
 QByteArray QGeoTiledMapReplyQGC::_badTile;
+
+QByteArray QGeoTiledMapReplyQGC::_applyMapSaturation(const QByteArray &imageData, const QString &format) const
+{
+    const SharedMapProvider mapProvider = UrlFactory::getMapProviderFromQtMapId(tileSpec().mapId());
+    if (!mapProvider || mapProvider->isElevationProvider()) {
+        return imageData;
+    }
+
+    const Fact *const saturationFact = SettingsManager::instance()->flightMapSettings()->mapSaturation();
+    const int saturationPercent = qBound(0, saturationFact->rawValue().toInt(), 150);
+    if (saturationPercent == 100) {
+        return imageData;
+    }
+
+    QImage image;
+    if (!image.loadFromData(imageData)) {
+        return imageData;
+    }
+
+    image = image.convertToFormat(QImage::Format_ARGB32);
+    const double saturation = static_cast<double>(saturationPercent) / 100.0;
+    for (int y = 0; y < image.height(); ++y) {
+        QRgb *const scanLine = reinterpret_cast<QRgb *>(image.scanLine(y));
+        for (int x = 0; x < image.width(); ++x) {
+            const QRgb pixel = scanLine[x];
+            const double luminance = (0.2126 * qRed(pixel)) +
+                                     (0.7152 * qGreen(pixel)) +
+                                     (0.0722 * qBlue(pixel));
+            const int red = qBound(0, qRound(luminance + ((qRed(pixel) - luminance) * saturation)), 255);
+            const int green = qBound(0, qRound(luminance + ((qGreen(pixel) - luminance) * saturation)), 255);
+            const int blue = qBound(0, qRound(luminance + ((qBlue(pixel) - luminance) * saturation)), 255);
+            scanLine[x] = qRgba(red, green, blue, qAlpha(pixel));
+        }
+    }
+
+    QByteArray adjustedData;
+    QBuffer buffer(&adjustedData);
+    if (!buffer.open(QIODevice::WriteOnly) || !image.save(&buffer, format.toLatin1().constData())) {
+        return imageData;
+    }
+    return adjustedData;
+}
 
 QGeoTiledMapReplyQGC::QGeoTiledMapReplyQGC(QNetworkAccessManager *networkManager, const QNetworkRequest &request, const QGeoTileSpec &spec, QObject *parent)
     : QGeoTiledMapReply(spec, parent)
@@ -121,17 +168,16 @@ void QGeoTiledMapReplyQGC::_networkReplyFinished()
             return;
         }
     }
-    setMapImageData(image);
-
     const QString format = mapProvider->getImageFormat(image);
     if (format.isEmpty()) {
         setError(QGeoTiledMapReply::ParseError, tr("Unknown Format"));
         return;
     }
-    setMapImageFormat(format);
 
     QGeoFileTileCacheQGC::cacheTile(mapProvider->getMapName(), tileSpec().x(), tileSpec().y(), tileSpec().zoom(), image, format);
 
+    setMapImageData(_applyMapSaturation(image, format));
+    setMapImageFormat(format);
     setFinished(true);
 }
 
@@ -167,7 +213,7 @@ void QGeoTiledMapReplyQGC::_networkReplySslErrors(const QList<QSslError> &errors
 void QGeoTiledMapReplyQGC::_cacheReply(QGCCacheTile *tile)
 {
     if (tile) {
-        setMapImageData(tile->img());
+        setMapImageData(_applyMapSaturation(tile->img(), tile->format()));
         setMapImageFormat(tile->format());
         setCached(true);
         setFinished(true);
