@@ -10,6 +10,7 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Dialogs
+import QtQuick.Shapes
 import QtLocation
 import QtPositioning
 
@@ -78,6 +79,7 @@ Item {
     readonly property int   loiterPathWidth:   32
     readonly property color loiterPathColor:   "#ffd400"
     readonly property real  loiterPathOpacity: 0.40
+    readonly property real  mapBearing: map && isFinite(Number(map.bearing)) ? Number(map.bearing) : 0
 
     property var _mapClickArea
     property var _loiterMarker
@@ -186,6 +188,8 @@ Item {
             tangentDistanceCircleComponent,
             entryLoiterCircleComponent,
             loiterCircleComponent,
+            loiterDirectionTopComponent,
+            loiterDirectionBottomComponent,
             returnLineComponent,
             airbrakeCircleComponent,
             airbrakeLabelComponent,
@@ -470,6 +474,63 @@ Item {
             color: "transparent"
             opacity: _root.loiterPathOpacity
             visible: _root.active && _root.loiterCoordinateValid && _root.loiterRadiusMeters > 0
+        }
+    }
+
+    component LoiterDirectionArrow: Shape {
+        property bool topIndicator: true
+
+        width: Math.max(ScreenTools.defaultFontPixelHeight * 1.35, 18)
+        height: width
+
+        transform: Rotation {
+            origin.x: width / 2
+            origin.y: height / 2
+            angle: (_root.controller && _root.controller.clockwise ? 0 : 180)
+                   + (topIndicator ? 180 : 0) - _root.mapBearing
+        }
+
+        ShapePath {
+            strokeWidth: 1
+            strokeColor: Qt.darker(_root.loiterPathColor, 1.45)
+            fillColor: _root.loiterPathColor
+            startX: 0
+            startY: width / 2
+            PathLine { x: width; y: width }
+            PathLine { x: width; y: 0 }
+            PathLine { x: 0; y: width / 2 }
+        }
+    }
+
+    Component {
+        id: loiterDirectionTopComponent
+
+        MapQuickItem {
+            z: QGroundControl.zOrderMapItems
+            coordinate: _root._circleCoordinate(0)
+            anchorPoint.x: sourceItem.width / 2
+            anchorPoint.y: sourceItem.height / 2
+            visible: _root.active && _root.loiterCoordinateValid && _root.loiterRadiusMeters > 0
+
+            sourceItem: LoiterDirectionArrow {
+                topIndicator: true
+            }
+        }
+    }
+
+    Component {
+        id: loiterDirectionBottomComponent
+
+        MapQuickItem {
+            z: QGroundControl.zOrderMapItems
+            coordinate: _root._circleCoordinate(180)
+            anchorPoint.x: sourceItem.width / 2
+            anchorPoint.y: sourceItem.height / 2
+            visible: _root.active && _root.loiterCoordinateValid && _root.loiterRadiusMeters > 0
+
+            sourceItem: LoiterDirectionArrow {
+                topIndicator: false
+            }
         }
     }
 

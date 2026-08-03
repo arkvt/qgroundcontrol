@@ -131,6 +131,8 @@ public:
     Q_INVOKABLE void execute();
     Q_INVOKABLE void cancel();
     Q_INVOKABLE void resetDraft();
+    Q_INVOKABLE void clearLoiterCoordinate();
+    Q_INVOKABLE void clearLandingCoordinate();
     Q_INVOKABLE bool readCurrentRtkAltitude();
 
 signals:

@@ -305,6 +305,16 @@ void CustomLandingController::setLandingCoordinate(const QGeoCoordinate& coordin
     _draftChanged();
 }
 
+void CustomLandingController::clearLoiterCoordinate()
+{
+    setLoiterCoordinate(QGeoCoordinate());
+}
+
+void CustomLandingController::clearLandingCoordinate()
+{
+    setLandingCoordinate(QGeoCoordinate());
+}
+
 void CustomLandingController::setLoiterAltitude(double altitude)
 {
     if (_busy || _planCommitted || _commitUncertain || fuzzyEqual(altitude, _loiterAltitude)) {

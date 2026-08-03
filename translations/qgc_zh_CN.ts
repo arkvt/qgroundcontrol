@@ -18681,6 +18681,8 @@ Confirm change?</translation>
     <message><source>Home</source><translation>Home</translation></message>
     <message><source>Synced from RTK by default</source><translation>默认同步自RTK</translation></message>
     <message><source>Sync altitude</source><translation>同步高度</translation></message>
+    <message><source>Delete vertical landing point</source><translation>删除垂直降落点</translation></message>
+    <message><source>Delete loiter descent point</source><translation>删除盘旋降高点</translation></message>
     <message><source>Synchronize the ground station altitude</source><translation>同步地面站高度</translation></message>
     <message><source>Home: %1 m</source><translation>Home：%1 米</translation></message>
     <message><source>Loiter height above landing</source><translation>盘旋高度（相对降落点）</translation></message>

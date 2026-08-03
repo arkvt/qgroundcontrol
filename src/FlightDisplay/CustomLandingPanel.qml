@@ -234,6 +234,36 @@ Rectangle {
         }
     }
 
+    component PointDeleteButton: QGCButton {
+        id: deleteButton
+
+        property bool pointSet: false
+        property string toolTipText
+
+        signal removeClicked()
+
+        readonly property real buttonSize: Math.round(ScreenTools.defaultFontPixelHeight * 1.55)
+
+        Layout.alignment: Qt.AlignRight | Qt.AlignVCenter
+        Layout.minimumWidth: buttonSize
+        Layout.maximumWidth: buttonSize
+        Layout.preferredWidth: buttonSize
+        Layout.minimumHeight: buttonSize
+        Layout.maximumHeight: buttonSize
+        Layout.preferredHeight: buttonSize
+        leftPadding: 0
+        rightPadding: 0
+        topPadding: 0
+        bottomPadding: 0
+        iconSource: "/res/TrashDelete.svg"
+        glassStyle: true
+        visible: pointSet
+        enabled: pointSet && _root.draftEditable
+        ToolTip.visible: hovered
+        ToolTip.text: toolTipText
+        onClicked: removeClicked()
+    }
+
     Flickable {
         id: panelFlickable
         anchors.fill: parent
@@ -376,6 +406,12 @@ Rectangle {
                             ToolTip.text: qsTr("Sync altitude")
                             onClicked: controller.readCurrentRtkAltitude()
                         }
+
+                        PointDeleteButton {
+                            pointSet: _root.landingCoordinateValid
+                            toolTipText: qsTr("Delete vertical landing point")
+                            onRemoveClicked: controller.clearLandingCoordinate()
+                        }
                     }
 
                     NumericFieldRow {
@@ -452,6 +488,12 @@ Rectangle {
                                 color: Qt.rgba(1, 1, 1, 0.62)
                                 font.pointSize: ScreenTools.smallFontPointSize
                             }
+                        }
+
+                        PointDeleteButton {
+                            pointSet: _root.loiterCoordinateValid
+                            toolTipText: qsTr("Delete loiter descent point")
+                            onRemoveClicked: controller.clearLoiterCoordinate()
                         }
                     }
 
