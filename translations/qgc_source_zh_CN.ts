@@ -1410,7 +1410,18 @@
     <message>
       <location filename="../src/AutoPilotPlugins/APM/APMPowerComponent.qml" line="167"/>
       <source>Battery2 monitor:</source>
-      <translation>电池2监控器</translation>
+      <translation>电池2监控器：</translation>
+    </message>
+    <message>
+      <location filename="../src/AutoPilotPlugins/APM/APMPowerComponent.qml" line="240"/>
+      <location filename="../src/AutoPilotPlugins/APM/APMPowerComponent.qml" line="289"/>
+      <source>Battery 3</source>
+      <translation>电池3</translation>
+    </message>
+    <message>
+      <location filename="../src/AutoPilotPlugins/APM/APMPowerComponent.qml" line="260"/>
+      <source>Battery3 monitor:</source>
+      <translation>电池3监控器：</translation>
     </message>
     <message>
       <location filename="../src/AutoPilotPlugins/APM/APMPowerComponent.qml" line="233"/>
@@ -4406,6 +4417,11 @@ Click Ok to start the auto-tuning process.
       <location filename="../src/QmlControls/BatteryIndicator.qml" line="256"/>
       <source>Voltage</source>
       <translation>电压</translation>
+    </message>
+    <message>
+      <location filename="../src/QmlControls/BatteryIndicator.qml" line="275"/>
+      <source>Capacity</source>
+      <translation>电池容量</translation>
     </message>
     <message>
       <location filename="../src/QmlControls/BatteryIndicator.qml" line="261"/>
@@ -10225,7 +10241,7 @@ Click Ok to start the auto-tuning process.
     <message>
       <location filename="../src/QmlControls/MainStatusIndicator.qml" line="46"/>
       <source>Ready To Fly</source>
-      <translation>可飞行</translation>
+      <translation>准备飞行</translation>
     </message>
     <message>
       <location filename="../src/QmlControls/MainStatusIndicator.qml" line="66"/>

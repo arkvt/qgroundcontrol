@@ -13,16 +13,19 @@
 #include "Vehicle.h"
 
 #include <QtQml/QQmlContext>
+#include <QtQml/QQmlEngine>
 #include <QtQuick/QQuickItem>
 
 QGC_LOGGING_CATEGORY(VehicleComponentLog, "qgc.autopilotplugin.vehiclecomponent");
 
 VehicleComponent::VehicleComponent(Vehicle *vehicle, AutoPilotPlugin *autopilot, AutoPilotPlugin::KnownVehicleComponent KnownVehicleComponent, QObject *parent)
-    : QObject(parent)
+    : QObject(parent ? parent : autopilot)
     , _vehicle(vehicle)
     , _autopilot(autopilot)
     , _KnownVehicleComponent(KnownVehicleComponent)
 {
+    QQmlEngine::setObjectOwnership(this, QQmlEngine::CppOwnership);
+
     // qCDebug(VehicleComponentLog) << Q_FUNC_INFO << this;
 
     if (!vehicle || !autopilot) {
