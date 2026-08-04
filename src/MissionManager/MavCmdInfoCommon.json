@@ -503,7 +503,7 @@
             "friendlyName": "Jump to item",
             "description":  "Mission will continue at the specified item.",
             "friendlyEdit": true,
-            "category":     "Advanced",
+            "category":     "Basic",
             "param1": {
                 "label":            "Item #",
                 "default":          1,
