@@ -39,6 +39,7 @@ FlightMap {
     property var    toolInsets                          // Insets for the center viewport area
 
     property var    _activeVehicle:             QGroundControl.multiVehicleManager.activeVehicle
+    property var    _vehicleWithPinnedInfo:     null
     property var    _planMasterController:      planMasterController
     property var    _geoFenceController:        planMasterController.geoFenceController
     property var    _rallyPointController:      planMasterController.rallyPointController
@@ -271,15 +272,37 @@ FlightMap {
         }
     }
 
-    // Add the vehicles to the map
+    // Add vehicle information cards below mission route lines. Vehicle icons are
+    // rendered separately above the route so they remain easy to identify/select.
     MapItemView {
         model: QGroundControl.multiVehicleManager.vehicles
         delegate: VehicleMapItem {
-            vehicle:        object
-            coordinate:     object.coordinate
-            map:            _root
-            size:           pipMode ? ScreenTools.defaultFontPixelHeight : ScreenTools.defaultFontPixelHeight * 3
-            z:              QGroundControl.zOrderVehicles
+            vehicle:            object
+            coordinate:         object.coordinate
+            map:                _root
+            showVehicleIcon:    false
+            showInfoCard:       true
+            infoPinned:         _root._vehicleWithPinnedInfo === object
+            size:               pipMode ? ScreenTools.defaultFontPixelHeight : ScreenTools.defaultFontPixelHeight * 3
+            z:                  QGroundControl.zOrderWaypointLines - 1
+        }
+    }
+
+    // Add the vehicle icons above mission route lines
+    MapItemView {
+        model: QGroundControl.multiVehicleManager.vehicles
+        delegate: VehicleMapItem {
+            vehicle:         object
+            coordinate:      object.coordinate
+            map:             _root
+            showVehicleIcon: true
+            showInfoCard:    false
+            size:            pipMode ? ScreenTools.defaultFontPixelHeight : ScreenTools.defaultFontPixelHeight * 3
+            z:               QGroundControl.zOrderVehicles
+
+            onInfoClicked: (clickedVehicle) => {
+                _root._vehicleWithPinnedInfo = _root._vehicleWithPinnedInfo === clickedVehicle ? null : clickedVehicle
+            }
         }
     }
     // Add distance sensor view

@@ -125,15 +125,16 @@ signals:
     void planCreatorsChanged                (QmlObjectListModel* planCreators);
     void managerVehicleChanged              (Vehicle* managerVehicle);
     void promptForPlanUsageOnVehicleChange  (void);
+    void sendToVehicleComplete              (void);
 
 private slots:
     void _activeVehicleChanged      (Vehicle* activeVehicle);
     void _loadMissionComplete       (void);
     void _loadGeoFenceComplete      (void);
     void _loadRallyPointsComplete   (void);
-    void _sendMissionComplete       (void);
-    void _sendGeoFenceComplete      (void);
-    void _sendRallyPointsComplete   (void);
+    void _sendMissionComplete       (bool error);
+    void _sendGeoFenceComplete      (bool error);
+    void _sendRallyPointsComplete   (bool error);
     void _updateOverallDirty        (void);
     void _updatePlanCreatorsList    (void);
 
@@ -153,6 +154,7 @@ private:
     bool                    _loadRallyPoints =          false;
     bool                    _sendGeoFence =             false;
     bool                    _sendRallyPoints =          false;
+    bool                    _sendHadError =             false;
     QString                 _currentPlanFile;
     bool                    _deleteWhenSendCompleted =  false;
     bool                    _previousOverallDirty =     false;

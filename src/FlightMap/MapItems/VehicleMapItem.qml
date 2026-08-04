@@ -30,6 +30,11 @@ MapQuickItem {
     property double heading:        vehicle ? vehicle.heading.value : Number.NaN    ///< Vehicle heading, NAN for none
     property real   size:           ScreenTools.defaultFontPixelHeight * 3          /// Default size for icon, most usage overrides this
     property bool   alert:          false                                           /// Collision alert
+    property bool   showVehicleIcon: true
+    property bool   showInfoCard:    true
+    property bool   infoPinned:      false
+
+    signal infoClicked(var vehicle)
 
     anchorPoint.x:  vehicleItem.width  / 2
     anchorPoint.y:  vehicleItem.height / 2
@@ -39,7 +44,6 @@ MapQuickItem {
     property bool   _adsbVehicle:   vehicle ? false : true
     property var    _map:           map
     property bool   _multiVehicle:  QGroundControl.multiVehicleManager.vehicles.count > 1
-    property bool   _infoPinned:    false
     property string _vehicleIconSource: {
         if (_adsbVehicle) {
             return alert ? "/qmlimages/AlertAircraft.svg" : "/qmlimages/AwarenessAircraft.svg"
@@ -194,7 +198,7 @@ MapQuickItem {
             }
             return _root._map.fromCoordinate(_root.coordinate, false).y
         }
-        property bool _cardOnLeft:    _root._map && _root._map.width > 0 && _screenX > _root._map.width * 0.62
+        property bool _cardOnLeft: _root._map && _root._map.width > 0 && _screenX > _root._map.width * 0.62
 
         MultiEffect {
             source: vehicleIcon
@@ -220,7 +224,7 @@ MapQuickItem {
                 property var gimbalYaw:       object.absoluteYaw.rawValue
                 rotation:                     gimbalYaw + 180
                 onGimbalYawChanged:           canvas.requestPaint()
-                visible:                      vehicle && !isNaN(gimbalYaw) && QGroundControl.settingsManager.gimbalControllerSettings.showAzimuthIndicatorOnMap.rawValue
+                visible:                      _root.showVehicleIcon && vehicle && !isNaN(gimbalYaw) && QGroundControl.settingsManager.gimbalControllerSettings.showAzimuthIndicatorOnMap.rawValue
                 opacity:                      object === vehicle.gimbalController.activeGimbal ? 1.0 : 0.4
 
                 Canvas {
@@ -273,6 +277,7 @@ MapQuickItem {
 
         Image {
             id:                 vehicleIcon
+            visible:            _root.showVehicleIcon
             source:             _vehicleIconSource
             mipmap:             true
             width:              _root.size
@@ -296,7 +301,7 @@ MapQuickItem {
             height:             width
             radius:             width / 2
             visible:            opacity > 0
-            opacity:            !_adsbVehicle && vehicle && infoButton.containsMouse && !ScreenTools.isMobile ? 1.0 : 0.0
+            opacity:            _root.showVehicleIcon && !_adsbVehicle && vehicle && infoButton.containsMouse && !ScreenTools.isMobile ? 1.0 : 0.0
             color:              Qt.rgba(0.045, 0.048, 0.052, 0.82)
             border.color:       Qt.rgba(0.82, 0.90, 0.95, 0.42)
             border.width:       1
@@ -318,31 +323,17 @@ MapQuickItem {
 
         Rectangle {
             id:         vehicleInfoCard
-            parent:     _root._map && _root._map.parent ? _root._map.parent : vehicleItem
             z:          10
-            visible:    !_adsbVehicle && vehicle && _root._infoPinned
+            visible:    _root.showInfoCard && !_adsbVehicle && vehicle && _root.infoPinned
             width:      Math.max(ScreenTools.defaultFontPixelWidth * 15.4, infoLayout.implicitWidth + vehicleItem._cardPaddingX * 2)
             height:     infoLayout.implicitHeight + vehicleItem._cardPaddingY * 2
-            x:          (_root._map ? _root._map.x : 0) + vehicleItem._screenX - _root.anchorPoint.x +
-                            (vehicleItem._cardOnLeft ? -width - vehicleItem._cardGap : vehicleIcon.width + vehicleItem._cardGap)
-            y:          (_root._map ? _root._map.y : 0) + vehicleItem._screenY - _root.anchorPoint.y +
-                            Math.round((vehicleIcon.height - height) / 2)
+            x:          vehicleItem._cardOnLeft ? -width - vehicleItem._cardGap : vehicleIcon.width + vehicleItem._cardGap
+            y:          Math.round((vehicleIcon.height - height) / 2)
             radius:     Math.round(ScreenTools.defaultFontPixelWidth * 0.58)
-            color:      "transparent"
-            border.color: Qt.rgba(0.82, 0.90, 0.95, _root._infoPinned ? 0.22 : 0.14)
+            color:      qgcPal.window
+            border.color: qgcPal.groupBorder
             border.width: 1
             clip:       true
-
-            GlassBackdrop {
-                anchors.fill:       parent
-                sourceItem:         _root._map
-                backdropBlurEnabled:true
-                targetItem:         vehicleInfoCard
-                sampleAtItemPosition: false
-                sampleX:            vehicleInfoCard.x - (_root._map ? _root._map.x : 0)
-                sampleY:            vehicleInfoCard.y - (_root._map ? _root._map.y : 0)
-                cornerRadius:       vehicleInfoCard.radius
-            }
 
             ColumnLayout {
                 id:                 infoLayout
@@ -420,14 +411,14 @@ MapQuickItem {
             id:             infoButton
             z:              20
             fillItem:       vehicleIcon
-            enabled:        !_adsbVehicle && !!vehicle
+            enabled:        _root.showVehicleIcon && !_adsbVehicle && !!vehicle
             hoverEnabled:   enabled && !ScreenTools.isMobile
             cursorShape:    Qt.PointingHandCursor
             onClicked: {
                 if (vehicle && QGroundControl.multiVehicleManager.activeVehicle !== vehicle) {
                     QGroundControl.multiVehicleManager.activeVehicle = vehicle
                 }
-                _root._infoPinned = !_root._infoPinned
+                _root.infoClicked(vehicle)
             }
         }
 
@@ -438,7 +429,7 @@ MapQuickItem {
             map:                        _map
             text:                       vehicleLabelText
             font.pointSize:             _adsbVehicle ? ScreenTools.defaultFontPointSize : ScreenTools.smallFontPointSize
-            visible:                    _adsbVehicle ? !isNaN(altitude) : _multiVehicle
+            visible:                    _root.showVehicleIcon && (_adsbVehicle ? !isNaN(altitude) : _multiVehicle)
             property string vehicleLabelText: visible ?
                                                   (_adsbVehicle ?
                                                        QGroundControl.unitsConversion.metersToAppSettingsVerticalDistanceUnits(altitude).toFixed(0) + " " + QGroundControl.unitsConversion.appSettingsHorizontalDistanceUnitsString + "\n" + callsign :

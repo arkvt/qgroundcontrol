@@ -265,8 +265,9 @@ void PlanMasterController::_loadRallyPointsComplete(void)
     qCDebug(PlanMasterControllerLog) << "PlanMasterController::_loadRallyPointsComplete";
 }
 
-void PlanMasterController::_sendMissionComplete(void)
+void PlanMasterController::_sendMissionComplete(bool error)
 {
+    _sendHadError |= error;
     if (_sendGeoFence) {
         _sendGeoFence = false;
         _sendRallyPoints = true;
@@ -275,14 +276,15 @@ void PlanMasterController::_sendMissionComplete(void)
             _geoFenceController.sendToVehicle();
         } else {
             qCDebug(PlanMasterControllerLog) << "PlanMasterController::sendToVehicle GeoFence not supported skipping";
-            _sendGeoFenceComplete();
+            _sendGeoFenceComplete(false);
         }
         setDirty(false);
     }
 }
 
-void PlanMasterController::_sendGeoFenceComplete(void)
+void PlanMasterController::_sendGeoFenceComplete(bool error)
 {
+    _sendHadError |= error;
     if (_sendRallyPoints) {
         _sendRallyPoints = false;
         if (_rallyPointController.supported()) {
@@ -290,14 +292,18 @@ void PlanMasterController::_sendGeoFenceComplete(void)
             _rallyPointController.sendToVehicle();
         } else {
             qCDebug(PlanMasterControllerLog) << "PlanMasterController::sendToVehicle Rally Points not support skipping";
-            _sendRallyPointsComplete();
+            _sendRallyPointsComplete(false);
         }
     }
 }
 
-void PlanMasterController::_sendRallyPointsComplete(void)
+void PlanMasterController::_sendRallyPointsComplete(bool error)
 {
+    _sendHadError |= error;
     qCDebug(PlanMasterControllerLog) << "PlanMasterController::sendToVehicle Rally Point send complete";
+    if (!_sendHadError) {
+        emit sendToVehicleComplete();
+    }
     if (_deleteWhenSendCompleted) {
         this->deleteLater();
     }
@@ -322,6 +328,7 @@ void PlanMasterController::sendToVehicle(void)
         qCWarning(PlanMasterControllerLog) << "PlanMasterController::sendToVehicle called while syncInProgress";
     } else {
         qCDebug(PlanMasterControllerLog) << "PlanMasterController::sendToVehicle start mission sendToVehicle";
+        _sendHadError = false;
         _sendGeoFence = true;
         _missionController.sendToVehicle();
         setDirty(false);

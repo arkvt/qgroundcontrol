@@ -179,6 +179,12 @@ Item {
             }
         }
 
+        onSendToVehicleComplete: {
+            mainWindow.showMessageDialog(qsTr("航线上传"),
+                                         qsTr("上传航线成功"),
+                                         Dialog.Ok)
+        }
+
         function waitingOnIncompleteDataMessage(save) {
             var saveOrUpload = save ? qsTr("Save") : qsTr("Upload")
             mainWindow.showMessageDialog(qsTr("Unable to %1").arg(saveOrUpload), qsTr("Plan has incomplete items. Complete all items and %1 again.").arg(saveOrUpload))
