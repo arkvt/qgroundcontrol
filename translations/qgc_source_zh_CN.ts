@@ -18401,9 +18401,13 @@ ROTATION_NONE 表示组件指向飞行方向。</translation>
       <translation>VTAL 初始检查</translation>
     </message>
     <message>
+      <source>Fixed Wing Initial Checks</source>
+      <translation>固定翼初始检查</translation>
+    </message>
+    <message>
       <location filename="../src/FlightDisplay/VTOLChecklist.qml" line="28"/>
-      <source>Hardware</source>
-      <translation>硬件</translation>
+      <source>1. Hardware</source>
+      <translation>1. 硬件</translation>
     </message>
     <message>
       <location filename="../src/FlightDisplay/VTOLChecklist.qml" line="29"/>
@@ -18411,9 +18415,53 @@ ROTATION_NONE 表示组件指向飞行方向。</translation>
       <translation>螺旋桨是否安装正确？机翼是否安全？尾部是否安全？</translation>
     </message>
     <message>
+      <source>2. Airspeed</source>
+      <translation>2. 空速</translation>
+    </message>
+    <message>
+      <source>Airspeed normal when stationary on the ground? Cover the sensor to increase airspeed?</source>
+      <translation>地面静止时空速正常？堵住传感器增加空速？</translation>
+    </message>
+    <message>
+      <source>3. Battery</source>
+      <translation>3. 电池</translation>
+    </message>
+    <message>
+      <source>4. Sensors</source>
+      <translation>4. 传感器</translation>
+    </message>
+    <message>
+      <source>Magnetometer, accelerometer, gyroscope, barometer, airspeed sensor, AHRS and GPS are healthy.</source>
+      <translation>磁力计、加速度计、陀螺仪、气压计、空速传感器、AHRS和GPS状态正常。</translation>
+    </message>
+    <message>
+      <source>5. GPS</source>
+      <translation>5. GPS</translation>
+    </message>
+    <message>
+      <source>3D positioning acquired; low satellite count was manually confirmed.</source>
+      <translation>已获得3D定位，低卫星数量已人工确认。</translation>
+    </message>
+    <message>
+      <source>3D positioning acquired; satellite count is 10 or more.</source>
+      <translation>已获得3D定位，卫星数量达到10颗以上。</translation>
+    </message>
+    <message>
+      <source>6. Radio Control</source>
+      <translation>6. 遥控器控制</translation>
+    </message>
+    <message>
       <location filename="../src/FlightDisplay/VTOLChecklist.qml" line="50"/>
       <source>Please arm the vehicle here</source>
       <translation>请在这儿解锁飞机</translation>
+    </message>
+    <message>
+      <source>Ground Station Check</source>
+      <translation>地面站检查</translation>
+    </message>
+    <message>
+      <source>33. Sound output</source>
+      <translation>33. 声音输出</translation>
     </message>
     <message>
       <location filename="../src/FlightDisplay/VTOLChecklist.qml" line="53"/>
@@ -18437,8 +18485,8 @@ ROTATION_NONE 表示组件指向飞行方向。</translation>
     </message>
     <message>
       <location filename="../src/FlightDisplay/VTOLChecklist.qml" line="63"/>
-      <source>Mission</source>
-      <translation>任务</translation>
+      <source>32. Mission</source>
+      <translation>32. 飞行任务</translation>
     </message>
     <message>
       <location filename="../src/FlightDisplay/VTOLChecklist.qml" line="64"/>
@@ -18452,13 +18500,17 @@ ROTATION_NONE 表示组件指向飞行方向。</translation>
     </message>
     <message>
       <location filename="../src/FlightDisplay/VTOLChecklist.qml" line="76"/>
-      <source>Payload</source>
-      <translation>有效荷载</translation>
+      <source>34. Payload</source>
+      <translation>34. 有效荷载</translation>
     </message>
     <message>
       <location filename="../src/FlightDisplay/VTOLChecklist.qml" line="77"/>
       <source>Configured and started? Payload lid closed?</source>
       <translation>已配置并已启动？载荷舱盖是否已关闭？</translation>
+    </message>
+    <message>
+      <source>35. Wind &amp; weather</source>
+      <translation>35. 风 &amp; 天气</translation>
     </message>
     <message>
       <location filename="../src/FlightDisplay/VTOLChecklist.qml" line="82"/>
@@ -18467,8 +18519,8 @@ ROTATION_NONE 表示组件指向飞行方向。</translation>
     </message>
     <message>
       <location filename="../src/FlightDisplay/VTOLChecklist.qml" line="86"/>
-      <source>Flight area</source>
-      <translation>飞行区域</translation>
+      <source>36. Flight area</source>
+      <translation>36. 飞行区域</translation>
     </message>
     <message>
       <location filename="../src/FlightDisplay/VTOLChecklist.qml" line="87"/>
@@ -18480,48 +18532,48 @@ ROTATION_NONE 表示组件指向飞行方向。</translation>
       <translation>舵面逻辑检查-手动飞行模式</translation>
     </message>
     <message>
-      <source>1. Move aileron stick left</source>
-      <translation>1. 副翼杆往左打</translation>
+      <source>7. Move aileron stick left</source>
+      <translation>7. 副翼杆往左打</translation>
     </message>
     <message>
       <source>Left aileron up; right aileron down.</source>
       <translation>左副翼向上、右副翼向下</translation>
     </message>
     <message>
-      <source>2. Move aileron stick right</source>
-      <translation>2. 副翼杆往右打</translation>
+      <source>8. Move aileron stick right</source>
+      <translation>8. 副翼杆往右打</translation>
     </message>
     <message>
       <source>Left aileron down; right aileron up.</source>
       <translation>左副翼向下、右副翼向上</translation>
     </message>
     <message>
-      <source>3. Move elevator stick up</source>
-      <translation>3. 升降杆往上</translation>
+      <source>9. Move elevator stick up</source>
+      <translation>9. 升降杆往上</translation>
     </message>
     <message>
       <source>Both V-tail surfaces move inward.</source>
       <translation>V尾同时向内</translation>
     </message>
     <message>
-      <source>4. Move elevator stick down</source>
-      <translation>4. 升降杆往下</translation>
+      <source>10. Move elevator stick down</source>
+      <translation>10. 升降杆往下</translation>
     </message>
     <message>
       <source>Both V-tail surfaces move outward.</source>
       <translation>V尾同时向外</translation>
     </message>
     <message>
-      <source>5. Move rudder stick left</source>
-      <translation>5. 方向杆向左</translation>
+      <source>11. Move rudder stick left</source>
+      <translation>11. 方向杆向左</translation>
     </message>
     <message>
       <source>Left tail surface moves upper-left; right tail surface moves lower-left.</source>
       <translation>左尾舵向左上、右尾舵向左下</translation>
     </message>
     <message>
-      <source>6. Move rudder stick right</source>
-      <translation>6. 方向杆向右</translation>
+      <source>12. Move rudder stick right</source>
+      <translation>12. 方向杆向右</translation>
     </message>
     <message>
       <source>Left tail surface moves lower-right; right tail surface moves upper-right.</source>
@@ -18532,36 +18584,36 @@ ROTATION_NONE 表示组件指向飞行方向。</translation>
       <translation>舵面逻辑检查-辅助A飞行模式</translation>
     </message>
     <message>
-      <source>7. Tilt aircraft left</source>
-      <translation>7. 飞机往左倾放置</translation>
+      <source>13. Tilt aircraft left</source>
+      <translation>13. 飞机往左倾放置</translation>
     </message>
     <message>
-      <source>8. Tilt aircraft right</source>
-      <translation>8. 飞机往右倾放置</translation>
+      <source>14. Tilt aircraft right</source>
+      <translation>14. 飞机往右倾放置</translation>
     </message>
     <message>
-      <source>9. Raise aircraft nose</source>
-      <translation>9. 飞机机头往上放置</translation>
+      <source>15. Raise aircraft nose</source>
+      <translation>15. 飞机机头往上放置</translation>
     </message>
     <message>
-      <source>10. Lower aircraft nose</source>
-      <translation>10. 飞机机头往下放置</translation>
+      <source>16. Lower aircraft nose</source>
+      <translation>16. 飞机机头往下放置</translation>
     </message>
     <message>
       <source>Airspeed Check</source>
       <translation>空速检查</translation>
     </message>
     <message>
-      <source>11. Do not blow into the airspeed tube</source>
-      <translation>11. 未对空速管气孔吹气</translation>
+      <source>17. Do not blow into the airspeed tube</source>
+      <translation>17. 未对空速管气孔吹气</translation>
     </message>
     <message>
       <source>Airspeed is 0-2 m/s; it may occasionally jump to 3 m/s or 4 m/s.</source>
       <translation>空速为0-2m/s，偶尔会跳动到3m/s、4m/s</translation>
     </message>
     <message>
-      <source>12. Blow directly into the airspeed tube</source>
-      <translation>12. 对准空速管气孔吹气</translation>
+      <source>18. Blow directly into the airspeed tube</source>
+      <translation>18. 对准空速管气孔吹气</translation>
     </message>
     <message>
       <source>Airspeed increases clearly above 10 m/s.</source>
@@ -18572,48 +18624,56 @@ ROTATION_NONE 表示组件指向飞行方向。</translation>
       <translation>卫星颗数检查</translation>
     </message>
     <message>
-      <source>13. Observe satellite count</source>
-      <translation>13. 观察卫星颗数</translation>
+      <source>19. Observe satellite count</source>
+      <translation>19. 观察卫星颗数</translation>
     </message>
     <message>
       <source>Satellite count is at least 28.</source>
       <translation>颗数≥28</translation>
     </message>
     <message>
+      <source>20. Observe satellite positioning accuracy</source>
+      <translation>20. 观察卫星定位精度</translation>
+    </message>
+    <message>
+      <source>Positioning accuracy is 0.8 or less.</source>
+      <translation>定位精度≤0.8</translation>
+    </message>
+    <message>
       <source>Flight Control Surface Check</source>
       <translation>飞前检查清单-舵面检查</translation>
     </message>
     <message>
-      <source>14. Send nose-up command</source>
-      <translation>14. 发送抬头命令</translation>
+      <source>21. Send nose-up command</source>
+      <translation>21. 发送抬头命令</translation>
     </message>
     <message>
-      <source>15. Send nose-down command</source>
-      <translation>15. 发送低头命令</translation>
+      <source>22. Send nose-down command</source>
+      <translation>22. 发送低头命令</translation>
     </message>
     <message>
-      <source>16. Send roll-left command</source>
-      <translation>16. 单击“向左横滚”按钮</translation>
+      <source>23. Send roll-left command</source>
+      <translation>23. 单击“向左横滚”按钮</translation>
     </message>
     <message>
-      <source>17. Send roll-right command</source>
-      <translation>17. 单击“向右横滚”按钮</translation>
+      <source>24. Send roll-right command</source>
+      <translation>24. 单击“向右横滚”按钮</translation>
     </message>
     <message>
-      <source>18. Send yaw-left command</source>
-      <translation>18. 单击“左偏航”按钮</translation>
+      <source>25. Send yaw-left command</source>
+      <translation>25. 单击“左偏航”按钮</translation>
     </message>
     <message>
-      <source>19. Send yaw-right command</source>
-      <translation>19. 单击“右偏航”按钮</translation>
+      <source>26. Send yaw-right command</source>
+      <translation>26. 单击“右偏航”按钮</translation>
     </message>
     <message>
       <source>Fixed-Wing Throttle Check</source>
       <translation>飞前检查清单-油门检查</translation>
     </message>
     <message>
-      <source>20. Test fixed-wing throttle</source>
-      <translation>20. 单击“油门”按钮</translation>
+      <source>27. Test fixed-wing throttle</source>
+      <translation>27. 单击“油门”按钮</translation>
     </message>
     <message>
       <source>Keep the propeller area clear. The fixed-wing motor should rotate counter-clockwise when viewed from tail to nose.</source>
@@ -18624,32 +18684,32 @@ ROTATION_NONE 表示组件指向飞行方向。</translation>
       <translation>飞前检查清单-电机检查</translation>
     </message>
     <message>
-      <source>21. Test motor A</source>
-      <translation>21. 单击“电机A”按钮</translation>
+      <source>28. Test motor A</source>
+      <translation>28. 单击“电机A”按钮</translation>
     </message>
     <message>
       <source>Front-right motor should rotate counter-clockwise.</source>
       <translation>右前电机逆时针旋转</translation>
     </message>
     <message>
-      <source>22. Test motor B</source>
-      <translation>22. 单击“电机B”按钮</translation>
+      <source>29. Test motor B</source>
+      <translation>29. 单击“电机B”按钮</translation>
     </message>
     <message>
       <source>Rear-right motor should rotate clockwise.</source>
       <translation>右后电机顺时针旋转</translation>
     </message>
     <message>
-      <source>23. Test motor C</source>
-      <translation>23. 单击“电机C”按钮</translation>
+      <source>30. Test motor C</source>
+      <translation>30. 单击“电机C”按钮</translation>
     </message>
     <message>
       <source>Rear-left motor should rotate counter-clockwise.</source>
       <translation>左后电机逆时针旋转</translation>
     </message>
     <message>
-      <source>24. Test motor D</source>
-      <translation>24. 单击“电机D”按钮</translation>
+      <source>31. Test motor D</source>
+      <translation>31. 单击“电机D”按钮</translation>
     </message>
     <message>
       <source>Front-left motor should rotate clockwise.</source>
@@ -18660,8 +18720,8 @@ ROTATION_NONE 表示组件指向飞行方向。</translation>
       <translation>飞检完成</translation>
     </message>
     <message>
-      <source>25. Aircraft flight check complete</source>
-      <translation>25. 无人机飞检完毕</translation>
+      <source>37. Aircraft flight check complete</source>
+      <translation>37. 无人机飞检完毕</translation>
     </message>
     <message>
       <source>Confirm that all flight-check items have been completed.</source>
