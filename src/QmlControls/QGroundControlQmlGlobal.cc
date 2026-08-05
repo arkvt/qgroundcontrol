@@ -40,6 +40,7 @@
 #include "QmlObjectListModel.h"
 #include "RCToParamDialogController.h"
 #include "TerrainProfile.h"
+#include "TrainingSimulatorController.h"
 #include "ToolStripAction.h"
 #include "ToolStripActionList.h"
 #include "VideoManager.h"
@@ -61,6 +62,7 @@
 
 #include <QtCore/QSettings>
 #include <QtCore/QLineF>
+#include <QtQml/QQmlEngine>
 
 QGC_LOGGING_CATEGORY(GuidedActionsControllerLog, "GuidedActionsControllerLog")
 
@@ -79,8 +81,27 @@ static QObject* qgroundcontrolQmlGlobalSingletonFactory(QQmlEngine*, QJSEngine*)
     return qmlGlobal;
 }
 
+static TrainingSimulatorController* trainingSimulatorControllerInstance()
+{
+    static TrainingSimulatorController *const controller = []() {
+        auto *const instance = new TrainingSimulatorController();
+        QQmlEngine::setObjectOwnership(instance, QQmlEngine::CppOwnership);
+        return instance;
+    }();
+    return controller;
+}
+
+static QObject* trainingSimulatorControllerSingletonFactory(QQmlEngine*, QJSEngine*)
+{
+    return trainingSimulatorControllerInstance();
+}
+
 void QGroundControlQmlGlobal::registerQmlTypes()
 {
+    // Create this manager eagerly so stale simulation processes can be removed
+    // before QGC starts accepting their MAVLink traffic.
+    (void) trainingSimulatorControllerInstance();
+
     qmlRegisterUncreatableType<FactValueGrid>           ("QGroundControl.Templates",             1, 0, "FactValueGrid",       "Reference only");
     qmlRegisterUncreatableType<FlightPathSegment>       ("QGroundControl",                       1, 0, "FlightPathSegment",   "Reference only");
     qmlRegisterUncreatableType<InstrumentValueData>     ("QGroundControl",                       1, 0, "InstrumentValueData", "Reference only");
@@ -107,6 +128,7 @@ void QGroundControlQmlGlobal::registerQmlTypes()
 
     qmlRegisterSingletonType<QGroundControlQmlGlobal>   ("QGroundControl",                       1, 0, "QGroundControl",         qgroundcontrolQmlGlobalSingletonFactory);
     qmlRegisterSingletonType<ScreenToolsController>     ("QGroundControl.ScreenToolsController", 1, 0, "ScreenToolsController",  screenToolsControllerSingletonFactory);
+    qmlRegisterSingletonType<TrainingSimulatorController>("QGroundControl.Controllers",          1, 0, "TrainingSimulator",       trainingSimulatorControllerSingletonFactory);
 }
 
 QGroundControlQmlGlobal::QGroundControlQmlGlobal(QObject *parent)

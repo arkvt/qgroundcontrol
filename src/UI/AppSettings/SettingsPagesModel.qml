@@ -49,6 +49,13 @@ ListModel {
     }
 
     ListElement {
+        name: qsTr("仿真训练")
+        url: "qrc:/qml/QGroundControl/AppSettings/SimulationSettings.qml"
+        iconUrl: "qrc:/InstrumentValueIcons/drone.svg"
+        pageVisible: function() { return true }
+    }
+
+    ListElement {
         name: qsTr("ADSB Server")
         url: "qrc:/qml/QGroundControl/AppSettings/ADSBServerSettings.qml"
         iconUrl: "qrc:/InstrumentValueIcons/airplane.svg"
