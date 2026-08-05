@@ -38,8 +38,8 @@ Rectangle {
     property var  backdropSourceItem:       null
     property real maximumHeight
 
-    property real _panelHeight:             Math.min(maximumHeight > 0 ? maximumHeight : Math.max(560, _panelWidth * 1.32),
-                                                     Math.max(560, Math.min(620, _panelWidth * 1.32)))
+    property real _panelHeight:             Math.min(maximumHeight > 0 ? maximumHeight : Math.max(600, _panelWidth * 1.40),
+                                                     Math.max(600, Math.min(660, _panelWidth * 1.40)))
     property real _panelMargin:             Math.max(6, ScreenTools.defaultFontPixelWidth * 0.48)
     property real _panelSpacing:            Math.max(4, ScreenTools.defaultFontPixelHeight * 0.20)
     property real _panelWidth:              Math.max(410,
@@ -47,13 +47,14 @@ Rectangle {
                                                               450))
     property real _contentHeight:           Math.max(1, _panelHeight - (_panelMargin * 2))
     property real _headerHeight:            Math.max(50, Math.min(60, _contentHeight * 0.105))
-    property real _metricHeight:            Math.max(270, Math.min(312, _contentHeight * 0.48))
+    property real _metricHeight:            Math.max(250, Math.min(290, _contentHeight * 0.44))
     property real _instrumentHeight:        Math.max(180, _contentHeight - _headerHeight - _metricHeight - (_panelSpacing * 2))
     property real _headingTapeHeight:       0
     property real _attitudeRowHeight:       Math.max(154, _instrumentHeight - (ScreenTools.defaultFontPixelHeight * 0.45))
     property real _scaleWidth:              Math.max(82, ScreenTools.defaultFontPixelWidth * 7.4)
     property real _scaleCompassGap:         Math.max(8, ScreenTools.defaultFontPixelWidth * 0.72)
-    property real _compassSize:             Math.max(126, Math.min(_attitudeRowHeight * 0.58,
+    property real _compassSize:             Math.max(140, Math.min(210,
+                                                                     _attitudeRowHeight * 0.86,
                                                                      _panelWidth - (_panelMargin * 2) - (_scaleWidth * 2) - (_scaleCompassGap * 2)))
     property real _compassReadoutGap:       Math.max(4, ScreenTools.defaultFontPixelHeight * 0.20)
     property real _scaleHeight:             Math.min(_attitudeRowHeight, _compassSize * 1.10)
@@ -105,6 +106,18 @@ Rectangle {
         return fact.rawValue
     }
 
+    function attitudeAngleText(fact) {
+        if (!fact || fact.rawValue === undefined || isNaN(fact.rawValue)) {
+            return "--"
+        }
+
+        var angle = Number(fact.rawValue)
+        if (Math.abs(angle) < 0.05) {
+            angle = 0
+        }
+        return (angle > 0 ? "+" : "") + angle.toFixed(1) + String.fromCharCode(176)
+    }
+
     function coordinateText(fact, fallbackText) {
         if (!fact || fact.rawValue === undefined || isNaN(fact.rawValue)) {
             return fallbackText
@@ -140,7 +153,7 @@ Rectangle {
                 return battery.voltage.valueString + (battery.voltage.units && battery.voltage.units !== "" ? " " + battery.voltage.units : "")
             }
         }
-        return qsTr("N/A")
+        return qsTr("无数据")
     }
 
     function batteryText(vehicle) {
@@ -153,25 +166,25 @@ Rectangle {
                 return battery.voltage.valueString + " " + battery.voltage.units
             }
         }
-        return qsTr("N/A")
+        return qsTr("无数据")
     }
 
     function vehicleKindText(vehicle) {
         if (!vehicle) {
-            return qsTr("Unknown")
+            return qsTr("未知")
         }
         if (vehicle.vehicleTypeString && vehicle.vehicleTypeString !== "" && vehicle.vehicleTypeString !== "MAV_TYPE_UNKNOWN") {
             return vehicle.vehicleTypeString
         }
-        return qsTr("Unknown")
+        return qsTr("未知")
     }
 
     function vehicleDisplayName(vehicle) {
-        return vehicle ? vehicleKindText(vehicle) + " #" + vehicle.id : qsTr("Unknown")
+        return vehicle ? vehicleKindText(vehicle) + " #" + vehicle.id : qsTr("未知")
     }
 
     function activeActionLabel() {
-        return _activeVehicle && _activeVehicle.armed ? qsTr("Disarm") : qsTr("Arm")
+        return _activeVehicle && _activeVehicle.armed ? qsTr("上锁") : qsTr("解锁")
     }
 
     function activeActionEnabled() {
@@ -234,7 +247,7 @@ Rectangle {
 
     function cardinalText(degrees) {
         var normalized = ((degrees % 360) + 360) % 360
-        var names = [qsTr("N"), qsTr("NE"), qsTr("E"), qsTr("SE"), qsTr("S"), qsTr("SW"), qsTr("W"), qsTr("NW")]
+        var names = [qsTr("北"), qsTr("东北"), qsTr("东"), qsTr("东南"), qsTr("南"), qsTr("西南"), qsTr("西"), qsTr("西北")]
         return names[Math.round(normalized / 45) % 8]
     }
 
@@ -564,7 +577,6 @@ Rectangle {
         id: attitudeCompass
 
         property var vehicle: null
-        property real headingValue: isNaN(topRightPanel.headingRaw(vehicle)) ? 0 : topRightPanel.headingRaw(vehicle)
         property real rollValue: vehicle && vehicle.roll && vehicle.roll.rawValue !== undefined && !isNaN(vehicle.roll.rawValue) ? vehicle.roll.rawValue : 0
         property real pitchValue: vehicle && vehicle.pitch && vehicle.pitch.rawValue !== undefined && !isNaN(vehicle.pitch.rawValue) ? vehicle.pitch.rawValue : 0
 
@@ -572,11 +584,9 @@ Rectangle {
             id: attitudeCanvas
             anchors.fill: parent
 
-            property real headingValue: attitudeCompass.headingValue
             property real rollValue:    attitudeCompass.rollValue
             property real pitchValue:   attitudeCompass.pitchValue
 
-            onHeadingValueChanged:  requestPaint()
             onRollValueChanged:     requestPaint()
             onPitchValueChanged:    requestPaint()
             onWidthChanged:         requestPaint()
@@ -589,125 +599,140 @@ Rectangle {
                 var w = width
                 var h = height
                 var cx = w / 2
-                var cy = (h / 2) - (h * 0.03)
-                var r = Math.max(1, Math.min(w, h) * 0.46)
-                var heading = headingValue
+                var cy = h / 2
+                var r = Math.max(1, Math.min(w, h) * 0.48)
                 var roll = rollValue * Math.PI / 180
                 var pitch = Math.max(-30, Math.min(30, pitchValue))
-                var pitchOffset = (pitch / 30) * r * 0.42
+                var pitchOffset = (pitch / 10) * r * 0.20
 
-                function sx(radius, degrees) {
+                function tickX(radius, degrees) {
                     var radians = degrees * Math.PI / 180
                     return cx + Math.sin(radians) * radius
                 }
 
-                function sy(radius, degrees) {
+                function tickY(radius, degrees) {
                     var radians = degrees * Math.PI / 180
                     return cy - Math.cos(radians) * radius
                 }
 
-                ctx.beginPath()
-                ctx.arc(cx, cy, r * 1.06, 0, Math.PI * 2)
-                ctx.fillStyle = Qt.rgba(0.16, 0.17, 0.18, 0.24)
-                ctx.fill()
-
                 ctx.save()
                 ctx.beginPath()
-                ctx.arc(cx, cy, r * 0.64, 0, Math.PI * 2)
+                ctx.arc(cx, cy, r, 0, Math.PI * 2)
                 ctx.clip()
                 ctx.translate(cx, cy)
                 ctx.rotate(-roll)
                 ctx.translate(0, pitchOffset)
 
-                ctx.fillStyle = Qt.rgba(0.30, 0.62, 0.90, 0.94)
-                ctx.fillRect(-r, -r * 1.35, r * 2, r * 1.35)
-                ctx.fillStyle = Qt.rgba(0.82, 0.64, 0.26, 0.96)
-                ctx.fillRect(-r, 0, r * 2, r * 1.35)
+                ctx.fillStyle = "#3f8fd4"
+                ctx.fillRect(-r * 3, -r * 3, r * 6, r * 3)
+                ctx.fillStyle = "#79c832"
+                ctx.fillRect(-r * 3, 0, r * 6, r * 3)
 
-                ctx.strokeStyle = Qt.rgba(1.0, 1.0, 0.96, 0.92)
-                ctx.lineWidth = Math.max(1.5, r * 0.018)
-                ctx.beginPath()
-                ctx.moveTo(-r * 0.72, 0)
-                ctx.lineTo(r * 0.72, 0)
-                ctx.stroke()
-
-                ctx.strokeStyle = Qt.rgba(1.0, 1.0, 0.96, 0.48)
-                ctx.lineWidth = 1
-                for (var p = -20; p <= 20; p += 10) {
-                    if (p === 0) {
-                        continue
-                    }
-                    var lineY = -(p / 30) * r * 0.42
-                    var lineW = Math.abs(p) === 20 ? r * 0.34 : r * 0.48
+                ctx.font = "700 " + Math.max(11, r * 0.14) + "px \"" + _panelFontFamily + "\""
+                ctx.textAlign = "center"
+                ctx.textBaseline = "middle"
+                ctx.fillStyle = "#ffffff"
+                for (var p = -20; p <= 20; p += 5) {
+                    var majorPitch = Math.abs(p) % 10 === 0
+                    var lineY = -(p / 10) * r * 0.20
+                    var lineW = majorPitch ? r * 0.42 : r * 0.25
+                    ctx.strokeStyle = "#ffffff"
+                    ctx.lineWidth = majorPitch ? Math.max(2, r * 0.025) : Math.max(1.5, r * 0.018)
                     ctx.beginPath()
                     ctx.moveTo(-lineW / 2, lineY)
                     ctx.lineTo(lineW / 2, lineY)
                     ctx.stroke()
+
+                    if (Math.abs(p) === 10) {
+                        ctx.fillText(p.toString(), -r * 0.47, lineY)
+                        ctx.fillText(p.toString(), r * 0.47, lineY)
+                    } else if (p === 0) {
+                        ctx.fillText("0", -r * 0.47, lineY)
+                        ctx.fillText("0", r * 0.47, lineY)
+                    }
                 }
                 ctx.restore()
 
-                ctx.strokeStyle = Qt.rgba(0.92, 0.94, 0.96, 0.14)
-                ctx.lineWidth = Math.max(1, r * 0.018)
+                ctx.strokeStyle = Qt.rgba(0.12, 0.38, 0.58, 0.88)
+                ctx.lineWidth = Math.max(1.5, r * 0.018)
                 ctx.beginPath()
-                ctx.arc(cx, cy, r * 0.66, 0, Math.PI * 2)
+                ctx.arc(cx, cy, r, 0, Math.PI * 2)
                 ctx.stroke()
 
-                for (var i = 0; i < 36; i++) {
-                    var degrees = (i * 10) - heading
-                    var major = i % 3 === 0
-                    var cardinal = i % 9 === 0
-                    var outer = r * 0.99
-                    var inner = major ? r * 0.86 : r * 0.91
-                    ctx.strokeStyle = cardinal ? Qt.rgba(0.95, 0.97, 0.99, 0.72) :
-                                                 (major ? Qt.rgba(0.95, 0.97, 0.99, 0.46) : Qt.rgba(0.95, 0.97, 0.99, 0.22))
-                    ctx.lineWidth = cardinal ? Math.max(1.6, r * 0.020) : (major ? Math.max(1.2, r * 0.014) : 1)
+                for (var tick = -60; tick <= 60; tick += 10) {
+                    if (tick === 0) {
+                        continue
+                    }
+
+                    var majorRoll = tick % 30 === 0
+                    var outer = r * 0.96
+                    var inner = majorRoll ? r * 0.80 : r * 0.86
+                    ctx.strokeStyle = "#ffffff"
+                    ctx.lineWidth = majorRoll ? Math.max(3, r * 0.038) : Math.max(2, r * 0.026)
                     ctx.beginPath()
-                    ctx.moveTo(sx(inner, degrees), sy(inner, degrees))
-                    ctx.lineTo(sx(outer, degrees), sy(outer, degrees))
+                    ctx.moveTo(tickX(inner, tick), tickY(inner, tick))
+                    ctx.lineTo(tickX(outer, tick), tickY(outer, tick))
                     ctx.stroke()
                 }
 
-                var labels = [topRightPanel.cardinalText(0), topRightPanel.cardinalText(90),
-                              topRightPanel.cardinalText(180), topRightPanel.cardinalText(270)]
-                var labelDegrees = [0, 90, 180, 270]
-                ctx.font = "700 " + Math.max(11, r * 0.15) + "px \"" + _panelFontFamily + "\""
-                ctx.textAlign = "center"
-                ctx.textBaseline = "middle"
-                for (var labelIndex = 0; labelIndex < labels.length; labelIndex++) {
-                    var labelAngle = labelDegrees[labelIndex] - heading
-                    ctx.fillStyle = labelDegrees[labelIndex] === 0 ? qgcPal.text : Qt.rgba(0.82, 0.85, 0.88, 0.78)
-                    ctx.fillText(labels[labelIndex], sx(r * 0.74, labelAngle), sy(r * 0.74, labelAngle))
-                }
-
-                ctx.fillStyle = qgcPal.primaryButton
-                ctx.beginPath()
-                ctx.moveTo(cx, cy - r * 1.12)
-                ctx.lineTo(cx - r * 0.055, cy - r * 1.00)
-                ctx.lineTo(cx + r * 0.055, cy - r * 1.00)
-                ctx.closePath()
-                ctx.fill()
-
-                ctx.strokeStyle = qgcPal.text
-                ctx.lineWidth = Math.max(2, r * 0.026)
+                // Fixed aircraft-level reference. The moving 0-degree horizon
+                // aligns with this line when pitch and roll are both zero.
+                ctx.strokeStyle = "#ff3b30"
+                ctx.lineWidth = Math.max(2.5, r * 0.026)
                 ctx.lineCap = "round"
                 ctx.beginPath()
-                ctx.moveTo(cx - r * 0.36, cy)
-                ctx.lineTo(cx - r * 0.12, cy)
-                ctx.lineTo(cx, cy + r * 0.055)
-                ctx.lineTo(cx + r * 0.12, cy)
-                ctx.lineTo(cx + r * 0.36, cy)
+                ctx.moveTo(cx - r * 0.94, cy)
+                ctx.lineTo(cx - r * 0.72, cy)
+                ctx.moveTo(cx + r * 0.72, cy)
+                ctx.lineTo(cx + r * 0.94, cy)
                 ctx.stroke()
+            }
+        }
 
-                ctx.fillStyle = qgcPal.primaryButton
-                ctx.beginPath()
-                ctx.arc(cx, cy, Math.max(2.4, r * 0.034), 0, Math.PI * 2)
-                ctx.fill()
+        Rectangle {
+            anchors.horizontalCenter:   parent.horizontalCenter
+            anchors.bottom:             parent.bottom
+            anchors.bottomMargin:       Math.max(6, parent.height * 0.055)
+            width:                      parent.width * 0.74
+            height:                     Math.max(26, parent.height * 0.16)
+            radius:                     Math.min(4, height * 0.16)
+            color:                      Qt.rgba(0.05, 0.07, 0.09, 0.78)
+            border.color:               Qt.rgba(0.90, 0.94, 0.98, 0.26)
+            border.width:               1
 
-                ctx.strokeStyle = Qt.rgba(0.92, 0.94, 0.96, 0.22)
-                ctx.lineWidth = Math.max(1, r * 0.012)
-                ctx.beginPath()
-                ctx.arc(cx, cy, r * 1.02, 0, Math.PI * 2)
-                ctx.stroke()
+            Row {
+                anchors.fill:       parent
+                anchors.margins:    Math.max(3, parent.height * 0.10)
+
+                QGCLabel {
+                    width:                  parent.width / 2
+                    height:                 parent.height
+                    text:                   qsTr("俯仰") + " " + topRightPanel.attitudeAngleText(attitudeCompass.vehicle ? attitudeCompass.vehicle.pitch : null)
+                    color:                  qgcPal.text
+                    font.bold:              true
+                    font.family:            _panelFontFamily
+                    font.pointSize:         Math.max(9, _panelLabelPointSize)
+                    fontSizeMode:           Text.HorizontalFit
+                    minimumPointSize:       8
+                    horizontalAlignment:    Text.AlignHCenter
+                    verticalAlignment:      Text.AlignVCenter
+                    maximumLineCount:       1
+                }
+
+                QGCLabel {
+                    width:                  parent.width / 2
+                    height:                 parent.height
+                    text:                   qsTr("横滚") + " " + topRightPanel.attitudeAngleText(attitudeCompass.vehicle ? attitudeCompass.vehicle.roll : null)
+                    color:                  qgcPal.text
+                    font.bold:              true
+                    font.family:            _panelFontFamily
+                    font.pointSize:         Math.max(9, _panelLabelPointSize)
+                    fontSizeMode:           Text.HorizontalFit
+                    minimumPointSize:       8
+                    horizontalAlignment:    Text.AlignHCenter
+                    verticalAlignment:      Text.AlignVCenter
+                    maximumLineCount:       1
+                }
             }
         }
 
@@ -984,7 +1009,7 @@ Rectangle {
 
                     QGCLabel {
                         Layout.fillWidth:   true
-                        text:               qsTr("Battery")
+                        text:               qsTr("电池")
                         color:              qgcPal.buttonText
                         font.family:        _panelFontFamily
                         font.pointSize:     _panelLabelPointSize
@@ -1200,9 +1225,9 @@ Rectangle {
                         anchors.verticalCenter: parent.verticalCenter
                         width:          _scaleWidth
                         height:         _scaleHeight
-                        title:          qsTr("Altitude")
+                        title:          qsTr("高度")
                         unit:           QGroundControl.unitsConversion.appSettingsVerticalDistanceUnitsString
-                        valueText:      factNumberText(_activeVehicle ? _activeVehicle.altitudeRelative : null, qsTr("N/A"))
+                        valueText:      factNumberText(_activeVehicle ? _activeVehicle.altitudeRelative : null, qsTr("无数据"))
                         numericValue:   factRawValue(_activeVehicle ? _activeVehicle.altitudeRelative : null)
                         stepValue:      25
                         leftScale:      true
@@ -1213,7 +1238,7 @@ Rectangle {
                         anchors.topMargin:          Math.max(2, ScreenTools.defaultFontPixelHeight * 0.12)
                         x:                          altitudeTape.x + altitudeTape.rulerCenterX() - (width / 2)
                         width:                      altitudeTape.width
-                        text:                       qsTr("Home AMSL") + " " + homeAltitudeText(_activeVehicle, qsTr("N/A"))
+                        text:                       qsTr("返航点海拔") + " " + homeAltitudeText(_activeVehicle, qsTr("无数据"))
                         color:                      qgcPal.buttonText
                         opacity:                    0.86
                         font.family:                _panelFontFamily
@@ -1244,7 +1269,7 @@ Rectangle {
 
                             QGCLabel {
                                 width:                    parent.width
-                                text:                     qsTr("HDG") + " " + topRightPanel.headingDisplayText()
+                                text:                     qsTr("航向") + " " + topRightPanel.headingDisplayText()
                                 color:                    qgcPal.text
                                 font.bold:                true
                                 font.family:              _panelFontFamily
@@ -1271,9 +1296,9 @@ Rectangle {
                         anchors.verticalCenter: parent.verticalCenter
                         width:          _scaleWidth
                         height:         _scaleHeight
-                        title:          qsTr("Ground Speed")
+                        title:          qsTr("地速")
                         unit:           QGroundControl.unitsConversion.appSettingsSpeedUnitsString
-                        valueText:      factNumberText(_activeVehicle ? _activeVehicle.groundSpeed : null, qsTr("N/A"))
+                        valueText:      factNumberText(_activeVehicle ? _activeVehicle.groundSpeed : null, qsTr("无数据"))
                         numericValue:   factRawValue(_activeVehicle ? _activeVehicle.groundSpeed : null)
                         stepValue:      10
                         minimumValue:   0
@@ -1285,8 +1310,8 @@ Rectangle {
                         anchors.topMargin:          Math.max(2, ScreenTools.defaultFontPixelHeight * 0.12)
                         x:                          speedTape.x + speedTape.rulerCenterX() - (width / 2)
                         width:                      speedTape.width
-                        text:                       qsTr("Airspeed") + " " +
-                                                    factText(_activeVehicle ? _activeVehicle.airSpeed : null, qsTr("N/A"))
+                        text:                       qsTr("空速") + " " +
+                                                    factText(_activeVehicle ? _activeVehicle.airSpeed : null, qsTr("无数据"))
                         color:                      qgcPal.buttonText
                         opacity:                    0.86
                         font.family:                _panelFontFamily
@@ -1321,7 +1346,7 @@ Rectangle {
             color:                  "transparent"
             clip:                   true
 
-            property int  _metricColumns:     4
+            property int  _metricColumns:     5
             property int  _metricRows:        5
             property real _metricCellWidth:   width / _metricColumns
             property real _bottomInset:       Math.max(10, ScreenTools.defaultFontPixelHeight * 0.72)
@@ -1353,26 +1378,31 @@ Rectangle {
             Repeater {
                 id: metricsGrid
                 model: [
-                    { "label": qsTr("Home Dist"),    "value": factText(_activeVehicle ? _activeVehicle.distanceToHome : null, qsTr("N/A")) },
-                    { "label": qsTr("Next WP"),      "value": factText(_activeVehicle ? _activeVehicle.distanceToNextWP : null, qsTr("N/A")) },
-                    { "label": qsTr("Climb"),        "value": factText(_activeVehicle ? _activeVehicle.climbRate : null, qsTr("N/A")) },
-                    { "label": qsTr("Voltage"),      "value": primaryVoltageText(_activeVehicle) },
-                    { "label": qsTr("AMSL Alt"),     "value": factText(_activeVehicle ? _activeVehicle.altitudeAMSL : null, qsTr("N/A")) },
-                    { "label": qsTr("Rel Alt"),      "value": factText(_activeVehicle ? _activeVehicle.altitudeRelative : null, qsTr("N/A")) },
-                    { "label": qsTr("GCS Rel Alt"),  "value": altitudeRelativeToGcsText(_activeVehicle, qsTr("N/A")) },
-                    { "label": qsTr("Thr"),          "value": factText(_activeVehicle ? _activeVehicle.throttlePct : null, qsTr("N/A")) },
-                    { "label": qsTr("GPS HDG"),      "value": factText(_activeVehicle && _activeVehicle.gps ? _activeVehicle.gps.courseOverGround : null, qsTr("N/A")) },
-                    { "label": qsTr("Flight Time"),  "value": factText(_activeVehicle ? _activeVehicle.flightTime : null, qsTr("00:00:00")) },
-                    { "label": qsTr("Flight Dist"),  "value": factText(_activeVehicle ? _activeVehicle.flightDistance : null, qsTr("N/A")) },
-                    { "label": qsTr("Home Time"),    "value": factText(_activeVehicle ? _activeVehicle.timeToHome : null, qsTr("N/A")) },
-                    { "label": qsTr("Course"),       "value": factText(_activeVehicle ? _activeVehicle.headingToNextWP : null, qsTr("N/A")) },
-                    { "label": qsTr("Pitch"),        "value": factText(_activeVehicle ? _activeVehicle.pitch : null, qsTr("N/A")) },
-                    { "label": qsTr("Roll"),         "value": factText(_activeVehicle ? _activeVehicle.roll : null, qsTr("N/A")) },
-                    { "label": qsTr("Wind Spd"),     "value": factText(_activeVehicle && _activeVehicle.wind ? _activeVehicle.wind.speed : null, qsTr("N/A")) },
-                    { "label": qsTr("Wind Dir"),     "value": factText(_activeVehicle && _activeVehicle.wind ? _activeVehicle.wind.direction : null, qsTr("N/A")) },
-                    { "label": qsTr("Heading"),      "value": factText(_activeVehicle ? _activeVehicle.heading : null, qsTr("N/A")) },
-                    { "label": qsTr("Lat"),          "value": coordinateText(_activeVehicle && _activeVehicle.gps ? _activeVehicle.gps.lat : null, qsTr("N/A")) },
-                    { "label": qsTr("Lon"),          "value": coordinateText(_activeVehicle && _activeVehicle.gps ? _activeVehicle.gps.lon : null, qsTr("N/A")) }
+                    { "label": qsTr("空速"), "value": factText(_activeVehicle ? _activeVehicle.airSpeed : null, qsTr("无数据")) },
+                    { "label": qsTr("地速"), "value": factText(_activeVehicle ? _activeVehicle.groundSpeed : null, qsTr("无数据")) },
+                    { "label": qsTr("航向"), "value": factText(_activeVehicle ? _activeVehicle.heading : null, qsTr("无数据")) },
+                    { "label": qsTr("横滚"), "value": factText(_activeVehicle ? _activeVehicle.roll : null, qsTr("无数据")) },
+                    { "label": qsTr("俯仰"), "value": factText(_activeVehicle ? _activeVehicle.pitch : null, qsTr("无数据")) },
+                    { "label": qsTr("爬升率"), "value": factText(_activeVehicle ? _activeVehicle.climbRate : null, qsTr("无数据")) },
+                    { "label": qsTr("下一航点"), "value": factText(_activeVehicle ? _activeVehicle.distanceToNextWP : null, qsTr("无数据")) },
+                    { "label": qsTr("返回距离"), "value": factText(_activeVehicle ? _activeVehicle.distanceToHome : null, qsTr("无数据")) },
+                    { "label": qsTr("目标航向"), "value": factText(_activeVehicle ? _activeVehicle.headingToNextWP : null, qsTr("无数据")) },
+                    { "label": qsTr("航程"), "value": factText(_activeVehicle ? _activeVehicle.flightDistance : null, qsTr("无数据")) },
+                    { "label": qsTr("海拔"), "value": factText(_activeVehicle ? _activeVehicle.altitudeAMSL : null, qsTr("无数据")) },
+                    { "label": qsTr("相对高度"), "value": factText(_activeVehicle ? _activeVehicle.altitudeRelative : null, qsTr("无数据")) },
+                    { "label": qsTr("地面站高差"), "value": altitudeRelativeToGcsText(_activeVehicle, qsTr("无数据")) },
+                    { "label": qsTr("返航点海拔"), "value": homeAltitudeText(_activeVehicle, qsTr("无数据")) },
+                    { "label": qsTr("返航时间"), "value": factText(_activeVehicle ? _activeVehicle.timeToHome : null, qsTr("无数据")) },
+                    { "label": qsTr("GPS航向"), "value": factText(_activeVehicle && _activeVehicle.gps ? _activeVehicle.gps.courseOverGround : null, qsTr("无数据")) },
+                    { "label": qsTr("飞行时间"), "value": factText(_activeVehicle ? _activeVehicle.flightTime : null, qsTr("00:00:00")) },
+                    { "label": qsTr("电压"), "value": primaryVoltageText(_activeVehicle) },
+                    { "label": qsTr("电池"), "value": batteryText(_activeVehicle) },
+                    { "label": qsTr("油门"), "value": factText(_activeVehicle ? _activeVehicle.throttlePct : null, qsTr("无数据")) },
+                    { "label": qsTr("风速"), "value": factText(_activeVehicle && _activeVehicle.wind ? _activeVehicle.wind.speed : null, qsTr("无数据")) },
+                    { "label": qsTr("风向"), "value": factText(_activeVehicle && _activeVehicle.wind ? _activeVehicle.wind.direction : null, qsTr("无数据")) },
+                    { "label": qsTr("纬度"), "value": coordinateText(_activeVehicle && _activeVehicle.gps ? _activeVehicle.gps.lat : null, qsTr("无数据")) },
+                    { "label": qsTr("经度"), "value": coordinateText(_activeVehicle && _activeVehicle.gps ? _activeVehicle.gps.lon : null, qsTr("无数据")) },
+                    { "label": qsTr("GPS卫星数"), "value": factNumberText(_activeVehicle && _activeVehicle.gps ? _activeVehicle.gps.count : null, qsTr("无数据")) }
                 ]
 
                 delegate: Item {
