@@ -1009,15 +1009,9 @@ private:
     struct FlightCheckCommandAckContext;
     static void _flightCheckCommandResultHandler(void* resultHandlerData, int compId, const mavlink_command_ack_t& ack, MavCmdResultFailureCode_t failureCode);
     static void _flightCheckModeResultHandler(void* resultHandlerData, int compId, const mavlink_command_ack_t& ack, MavCmdResultFailureCode_t failureCode);
-    static void _flightCheckArmResultHandler(void* resultHandlerData, int compId, const mavlink_command_ack_t& ack, MavCmdResultFailureCode_t failureCode);
-    static void _flightCheckDisarmResultHandler(void* resultHandlerData, int compId, const mavlink_command_ack_t& ack, MavCmdResultFailureCode_t failureCode);
-    static void _flightCheckFbwaRestoreResultHandler(void* resultHandlerData, int compId, const mavlink_command_ack_t& ack, MavCmdResultFailureCode_t failureCode);
     void _finishFlightCheckCommand(quint64 requestId, bool accepted);
-    bool _armForFlightCheckThrottle(quint64 requestId);
-    bool _disarmAfterFlightCheckThrottle(quint64 requestId);
     bool _startFlightCheckControlPulse(quint64 requestId);
     bool _startFlightCheckMotorTest(quint64 requestId);
-    bool _restoreFlightCheckFbwa(quint64 requestId);
     bool _sendFlightCheckManualControl(int16_t roll, int16_t pitch, int16_t throttle, int16_t yaw);
 
     int     _id;                    ///< Mavlink system id
@@ -1076,10 +1070,7 @@ private:
     quint64         _flightCheckRequestId                    = 0;
     QTimer          _flightCheckCommandTimeoutTimer;
     QTimer          _flightCheckControlPulseTimer;
-    bool            _flightCheckWaitingForArm               = false;
-    bool            _flightCheckWaitingForDisarm            = false;
     int             _flightCheckControlPulseSendsRemaining  = 0;
-    int             _flightCheckThrottleZeroSendsRemaining  = 0;
     int16_t         _flightCheckControlRoll                  = INT16_MAX;
     int16_t         _flightCheckControlPitch                 = INT16_MAX;
     int16_t         _flightCheckControlThrottle              = INT16_MAX;
