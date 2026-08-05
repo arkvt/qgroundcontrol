@@ -214,9 +214,16 @@ SetupPage {
                     property Fact _failsafeThrEnable:   controller.getParameterFact(-1, "THR_FAILSAFE")
                     property Fact _failsafeThrValue:    controller.getParameterFact(-1, "THR_FS_VALUE")
                     property Fact _failsafeGCSEnable:   controller.getParameterFact(-1, "FS_GCS_ENABL")
+                    property Fact _failsafeLongTimeout: controller.getParameterFact(-1, "FS_LONG_TIMEOUT", false /* reportMissing */)
+                    property Fact _failsafeLongAction:  controller.getParameterFact(-1, "FS_LONG_ACTN", false /* reportMissing */)
+                    property Fact _failsafeEKFThreshold: controller.getParameterFact(-1, "FS_EKF_THRESH", false /* reportMissing */)
+
+                    property bool _failsafeLongTimeoutAvailable: controller.parameterExists(-1, "FS_LONG_TIMEOUT")
+                    property bool _failsafeLongActionAvailable:  controller.parameterExists(-1, "FS_LONG_ACTN")
+                    property bool _failsafeEKFThresholdAvailable: controller.parameterExists(-1, "FS_EKF_THRESH")
 
                     QGCLabel {
-                        text:       qsTr("Failsafe Triggers")
+                        text:       qsTr("故障保护触发器")
                         font.bold:   true
                     }
 
@@ -234,7 +241,7 @@ SetupPage {
                             RowLayout {
                                 QGCCheckBox {
                                     id:                 throttleEnableCheckBox
-                                    text:               qsTr("Throttle PWM threshold:")
+                                    text:               qsTr("油门PWM阈值:")
                                     checked:            _failsafeThrEnable.value === 1
 
                                     onClicked: _failsafeThrEnable.value = (checked ? 1 : 0)
@@ -248,9 +255,48 @@ SetupPage {
                             }
 
                             QGCCheckBox {
-                                text:       qsTr("GCS failsafe")
+                                text:       qsTr("链路故障保护")
                                 checked:    _failsafeGCSEnable.value != 0
                                 onClicked:  _failsafeGCSEnable.value = checked ? 1 : 0
+                            }
+
+                            GridLayout {
+                                columns:        2
+                                columnSpacing:  _margins
+                                rowSpacing:     _innerMargin
+                                visible:        _failsafeLongTimeoutAvailable || _failsafeLongActionAvailable || _failsafeEKFThresholdAvailable
+
+                                QGCLabel {
+                                    text:       qsTr("长超时:")
+                                    visible:    _failsafeLongTimeoutAvailable
+                                }
+                                FactTextField {
+                                    fact:               _failsafeLongTimeout
+                                    showUnits:          true
+                                    Layout.fillWidth:   true
+                                    visible:            _failsafeLongTimeoutAvailable
+                                }
+
+                                QGCLabel {
+                                    text:       qsTr("长动作:")
+                                    visible:    _failsafeLongActionAvailable
+                                }
+                                FactComboBox {
+                                    fact:               _failsafeLongAction
+                                    indexModel:         false
+                                    Layout.fillWidth:   true
+                                    visible:            _failsafeLongActionAvailable
+                                }
+
+                                QGCLabel {
+                                    text:       qsTr("EKF方差阈值:")
+                                    visible:    _failsafeEKFThresholdAvailable
+                                }
+                                FactTextField {
+                                    fact:               _failsafeEKFThreshold
+                                    Layout.fillWidth:   true
+                                    visible:            _failsafeEKFThresholdAvailable
+                                }
                             }
                         }
                     } // Rectangle - Failsafe trigger settings
@@ -403,17 +449,21 @@ SetupPage {
 
                     property Fact _fenceAction: controller.getParameterFact(-1, "FENCE_ACTION")
                     property Fact _fenceAltMax: controller.getParameterFact(-1, "FENCE_ALT_MAX")
+                    property Fact _fenceAltMin: controller.getParameterFact(-1, "FENCE_ALT_MIN", false /* reportMissing */)
                     property Fact _fenceEnable: controller.getParameterFact(-1, "FENCE_ENABLE")
                     property Fact _fenceMargin: controller.getParameterFact(-1, "FENCE_MARGIN")
                     property Fact _fenceRadius: controller.getParameterFact(-1, "FENCE_RADIUS")
                     property Fact _fenceType:   controller.getParameterFact(-1, "FENCE_TYPE")
 
+                    property bool _fenceAltMinAvailable: controller.parameterExists(-1, "FENCE_ALT_MIN")
+
                     readonly property int _maxAltitudeFenceBitMask: 1
                     readonly property int _circleFenceBitMask:      2
                     readonly property int _polygonFenceBitMask:     4
+                    readonly property int _minAltitudeFenceBitMask: 8
 
                     QGCLabel {
-                        text:           qsTr("GeoFence")
+                        text:           qsTr("地理围栏")
                         font.bold:      true
                     }
 
@@ -426,11 +476,11 @@ SetupPage {
                             id:         mainLayout
                             x:          _margins
                             y:          _margins
-                            spacing:    ScreenTools.defaultFontPixellHeight / 2
+                            spacing:    ScreenTools.defaultFontPixelHeight / 2
 
                             FactCheckBox {
                                 id:     enabledCheckBox
-                                text:   qsTr("Enabled")
+                                text:   qsTr("已启用")
                                 fact:   _fenceEnable
                             }
 
@@ -439,31 +489,52 @@ SetupPage {
                                 enabled:    enabledCheckBox.checked
 
                                 QGCCheckBox {
-                                    text:       qsTr("Maximum Altitude")
+                                    text:       qsTr("最大高度")
                                     checked:    _fenceType.rawValue & _maxAltitudeFenceBitMask
 
                                     onClicked: {
                                         if (checked) {
                                             _fenceType.rawValue |= _maxAltitudeFenceBitMask
                                         } else {
-                                            _fenceType.value &= ~_maxAltitudeFenceBitMask
+                                            _fenceType.rawValue &= ~_maxAltitudeFenceBitMask
                                         }
                                     }
                                 }
 
                                 FactTextField {
-                                    fact: _fenceAltMax
+                                    fact:       _fenceAltMax
+                                    showUnits:  true
                                 }
 
                                 QGCCheckBox {
-                                    text:       qsTr("Circle centered on Home")
+                                    text:       qsTr("最低高度")
+                                    checked:    _fenceAltMinAvailable && (_fenceType.rawValue & _minAltitudeFenceBitMask)
+                                    visible:    _fenceAltMinAvailable
+
+                                    onClicked: {
+                                        if (checked) {
+                                            _fenceType.rawValue |= _minAltitudeFenceBitMask
+                                        } else {
+                                            _fenceType.rawValue &= ~_minAltitudeFenceBitMask
+                                        }
+                                    }
+                                }
+
+                                FactTextField {
+                                    fact:       _fenceAltMin
+                                    showUnits:  true
+                                    visible:    _fenceAltMinAvailable
+                                }
+
+                                QGCCheckBox {
+                                    text:       qsTr("以返航点为中心的圆圈")
                                     checked:    _fenceType.rawValue & _circleFenceBitMask
 
                                     onClicked: {
                                         if (checked) {
                                             _fenceType.rawValue |= _circleFenceBitMask
                                         } else {
-                                            _fenceType.value &= ~_circleFenceBitMask
+                                            _fenceType.rawValue &= ~_circleFenceBitMask
                                         }
                                     }
                                 }
@@ -474,14 +545,14 @@ SetupPage {
                                 }
 
                                 QGCCheckBox {
-                                    text:       qsTr("Inclusion/Exclusion Circles+Polygons")
+                                    text:       qsTr("包含/排除圆形和多边形")
                                     checked:    _fenceType.rawValue & _polygonFenceBitMask
 
                                     onClicked: {
                                         if (checked) {
                                             _fenceType.rawValue |= _polygonFenceBitMask
                                         } else {
-                                            _fenceType.value &= ~_polygonFenceBitMask
+                                            _fenceType.rawValue &= ~_polygonFenceBitMask
                                         }
                                     }
                                 }
@@ -502,7 +573,7 @@ SetupPage {
                                 enabled: enabledCheckBox.checked
 
                                 QGCLabel {
-                                    text: qsTr("Breach action")
+                                    text: qsTr("越界行为")
                                 }
 
                                 FactComboBox {
@@ -511,11 +582,12 @@ SetupPage {
                                 }
 
                                 QGCLabel {
-                                    text: qsTr("Fence margin")
+                                    text: qsTr("围栏边距")
                                 }
 
                                 FactTextField {
-                                    fact: _fenceMargin
+                                    fact:       _fenceMargin
+                                    showUnits:  true
                                 }
                             }
                         }
@@ -524,7 +596,7 @@ SetupPage {
             }
 
             Loader {
-                sourceComponent: controller.vehicle.multiRotor ? copterGeoFence : undefined
+                sourceComponent: (controller.vehicle.multiRotor || controller.vehicle.fixedWing) && controller.parameterExists(-1, "FENCE_ENABLE") ? copterGeoFence : undefined
             }
 
             Component {
@@ -667,15 +739,29 @@ SetupPage {
                             return controller.getParameterFact(-1, "RTL_ALTITUDE")
                         }
                     }
+                    property Fact _rtlAutoLandFact: controller.getParameterFact(-1, "RTL_AUTOLAND", false /* reportMissing */)
+                    property Fact _rtlRadiusFact: {
+                        if (controller.parameterExists(-1, "RTL_RADIUS")) {
+                            return controller.getParameterFact(-1, "RTL_RADIUS", false /* reportMissing */)
+                        }
+                        return controller.getParameterFact(-1, "WP_LOITER_RAD", false /* reportMissing */)
+                    }
+
+                    property bool _rtlAutoLandAvailable: controller.parameterExists(-1, "RTL_AUTOLAND")
+                    property bool _rtlRadiusAvailable:   controller.parameterExists(-1, "RTL_RADIUS") || controller.parameterExists(-1, "WP_LOITER_RAD")
 
                     QGCLabel {
-                        text:           qsTr("Return to Launch")
+                        text:           qsTr("返航")
                         font.bold:      true
                     }
 
                     Rectangle {
-                        width:  rltAltField.x + rltAltField.width + _margins
-                        height: rltAltField.y + rltAltField.height + _margins
+                        width:  Math.max(rltAltField.x + rltAltField.width,
+                                         rtlAutoLandField.x + rtlAutoLandField.width,
+                                         rtlRadiusField.x + rtlRadiusField.width) + _margins
+                        height: (_rtlRadiusAvailable ? rtlRadiusField.y + rtlRadiusField.height
+                                                     : (_rtlAutoLandAvailable ? rtlAutoLandField.y + rtlAutoLandField.height
+                                                                              : rltAltField.y + rltAltField.height)) + _margins
                         color:  Qt.rgba(1, 1, 1, 0.026)
 
                         QGCRadioButton {
@@ -683,7 +769,7 @@ SetupPage {
                             anchors.margins:    _margins
                             anchors.left:       parent.left
                             anchors.top:        parent.top
-                            text:               qsTr("Return at current altitude")
+                            text:               qsTr("维持当前高度返航")
                             checked:            _rtlAltFact.value < 0
 
                             onClicked: _rtlAltFact.value = -1
@@ -694,7 +780,7 @@ SetupPage {
                             anchors.topMargin:  _margins / 2
                             anchors.left:       returnAtCurrentRadio.left
                             anchors.top:        returnAtCurrentRadio.bottom
-                            text:               qsTr("Return at specified altitude:")
+                            text:               qsTr("爬升到特定高度返航:")
                             checked:            _rtlAltFact.value >= 0
 
                             onClicked: _rtlAltFact.value = 10000
@@ -708,6 +794,44 @@ SetupPage {
                             fact:               _rtlAltFact
                             showUnits:          true
                             enabled:            returnAltRadio.checked
+                        }
+
+                        QGCLabel {
+                            id:                 rtlAutoLandLabel
+                            anchors.left:       returnAtCurrentRadio.left
+                            anchors.top:        rltAltField.bottom
+                            anchors.topMargin:  _innerMargin
+                            text:               qsTr("自动着陆:")
+                            visible:            _rtlAutoLandAvailable
+                        }
+
+                        FactComboBox {
+                            id:                 rtlAutoLandField
+                            anchors.left:       rltAltField.left
+                            anchors.baseline:   rtlAutoLandLabel.baseline
+                            width:              Math.max(rltAltField.width, ScreenTools.defaultFontPixelWidth * 18)
+                            fact:               _rtlAutoLandFact
+                            indexModel:         false
+                            visible:            _rtlAutoLandAvailable
+                        }
+
+                        QGCLabel {
+                            id:                 rtlRadiusLabel
+                            anchors.left:       returnAtCurrentRadio.left
+                            anchors.top:        _rtlAutoLandAvailable ? rtlAutoLandField.bottom : rltAltField.bottom
+                            anchors.topMargin:  _innerMargin
+                            text:               qsTr("盘旋半径:")
+                            visible:            _rtlRadiusAvailable
+                        }
+
+                        FactTextField {
+                            id:                 rtlRadiusField
+                            anchors.left:       rltAltField.left
+                            anchors.baseline:   rtlRadiusLabel.baseline
+                            width:              rtlAutoLandField.width
+                            fact:               _rtlRadiusFact
+                            showUnits:          true
+                            visible:            _rtlRadiusAvailable
                         }
                     } // Rectangle - RTL Settings
                 } // Column - RTL Settings
