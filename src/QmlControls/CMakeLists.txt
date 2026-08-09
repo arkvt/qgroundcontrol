@@ -53,6 +53,8 @@ target_sources(${CMAKE_PROJECT_NAME}
         ScreenToolsController.h
         TerrainProfile.cc
         TerrainProfile.h
+        TrainingSimulatorController.cc
+        TrainingSimulatorController.h
         ToolStripAction.cc
         ToolStripAction.h
         ToolStripActionList.cc

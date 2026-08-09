@@ -556,6 +556,13 @@ qt_add_resources(${CMAKE_PROJECT_NAME} "qgcresources_cmake"
         ${QGC_GSTREAMER_SHADER_RESOURCES}
 )
 
+qt_add_resources(${CMAKE_PROJECT_NAME} "training_simulator_resources"
+    PREFIX "/training"
+    BASE "resources/training"
+    FILES
+        resources/training/simulate_rtk_nmea_udp.py
+)
+
 # cmake_print_variables(QT_ALL_PLUGIN_TYPES_FOUND_VIA_FIND_PACKAGE)
 qt_import_plugins(${CMAKE_PROJECT_NAME}
     INCLUDE Qt6::QSvgPlugin

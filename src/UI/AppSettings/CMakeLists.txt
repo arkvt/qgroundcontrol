@@ -20,6 +20,7 @@ qt_add_qml_module(AppSettingsModule
         PX4LogTransferSettings.qml
         RemoteIDSettings.qml
         SerialSettings.qml
+        SimulationSettings.qml
         SettingsPage.qml
         SettingsPagesModel.qml
         TcpSettings.qml
