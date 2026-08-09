@@ -33,11 +33,22 @@ Rectangle {
     property real _operationSeparatorExtraGap: ScreenTools.defaultFontPixelWidth * 2
     property real _toolButtonWidth:    Math.max(ScreenTools.defaultFontPixelWidth * 7.35, ScreenTools.minTouchPixels * 1.02)
     property real _toolIconSize:       ScreenTools.defaultFontPixelHeight * 1.26
+    property real _favoriteModeButtonWidth: Math.max(ScreenTools.defaultFontPixelWidth * 8.8, ScreenTools.minTouchPixels * 1.06)
+    property real _favoriteModeGroupPadding: ScreenTools.defaultFontPixelWidth * 0.24
+    property real _favoriteModeGroupSpacing: 1
     property int  _visibleToolActionCount: visibleToolActionCount()
+    property int  _visibleFavoriteModeCount: flyActionList.activeVehicle && flyActionList.activeVehicle.flightModeSetAvailable ? flyActionList.favoriteModesForToolbar.length : 0
+    property int  _visibleFavoriteModeGroupCount: _visibleFavoriteModeCount > 0 ? 1 : 0
+    property int  _visibleLayoutItemCount: _visibleToolActionCount + _visibleFavoriteModeGroupCount
     property int  _operationSeparatorCount: operationSeparatorCount()
-    property real _toolActionsWidth:   _visibleToolActionCount > 0 ?
+    property real _favoriteModeGroupWidth: _visibleFavoriteModeCount > 0 ?
+                                                ((_favoriteModeGroupPadding * 2) +
+                                                 (_visibleFavoriteModeCount * _favoriteModeButtonWidth) +
+                                                 (Math.max(0, _visibleFavoriteModeCount - 1) * _favoriteModeGroupSpacing)) : 0
+    property real _toolActionsWidth:   _visibleLayoutItemCount > 0 ?
                                             ((_visibleToolActionCount * _toolButtonWidth) +
-                                             (Math.max(0, _visibleToolActionCount - 1) * _rowSpacing) +
+                                             _favoriteModeGroupWidth +
+                                             (Math.max(0, _visibleLayoutItemCount - 1) * _rowSpacing) +
                                              (_operationSeparatorCount * _operationSeparatorExtraGap)) : 0
     property real _contentPreferredWidth: (_stripMargin * 2) + _toolActionsWidth
     property real spacing:             0
@@ -65,6 +76,7 @@ Rectangle {
 
     FlyViewToolStripActionList {
         id: flyActionList
+        modePanelAvailableWidth: bottomStrip.parent ? bottomStrip.parent.width : ScreenTools.screenWidth
         onDisplayPreFlightChecklist: bottomStrip.displayPreFlightChecklist()
     }
 
@@ -72,18 +84,58 @@ Rectangle {
         id:                 dropPanel
         toolStrip:          bottomStrip
         allowOutsideParent: true
+        keepOpenOnOutsideClick: flyActionList.modePanelPinned && _parentButton &&
+                                _parentButton.toolStripAction === flyActionList.modeActionItem
         z:                  QGroundControl.zOrderWidgets + 1
     }
 
+    function hideDropPanelAndUnpin() {
+        if (dropPanel._parentButton && dropPanel._parentButton.toolStripAction === flyActionList.modeActionItem) {
+            flyActionList.modePanelPinned = false
+        }
+        dropPanel.hide()
+    }
+
     function clearOtherActionChecks(activeIndex) {
-        for (var i = 0; i < actionRepeater.count; i++) {
-            if (i !== activeIndex) {
-                var item = actionRepeater.itemAt(i)
-                if (item) {
+        var repeaters = [ leadingActionRepeater, trailingActionRepeater ]
+        for (var repeaterIndex = 0; repeaterIndex < repeaters.length; repeaterIndex++) {
+            var repeater = repeaters[repeaterIndex]
+            for (var itemIndex = 0; itemIndex < repeater.count; itemIndex++) {
+                var item = repeater.itemAt(itemIndex)
+                if (item && item.actionIndex !== activeIndex) {
                     item.checked = false
                 }
             }
         }
+    }
+
+    function modeActionIndex() {
+        for (var i = 0; i < flyActionList.model.length; i++) {
+            var action = flyActionList.model[i]
+            if (action && typeof action.statusAction !== "undefined" && action.statusAction) {
+                return i
+            }
+        }
+        return -1
+    }
+
+    function actionsThroughMode() {
+        var actions = []
+        var splitIndex = modeActionIndex()
+        var endIndex = splitIndex >= 0 ? splitIndex : flyActionList.model.length - 1
+        for (var i = 0; i <= endIndex; i++) {
+            actions.push(flyActionList.model[i])
+        }
+        return actions
+    }
+
+    function actionsAfterMode() {
+        var actions = []
+        var splitIndex = modeActionIndex()
+        for (var i = splitIndex + 1; i < flyActionList.model.length; i++) {
+            actions.push(flyActionList.model[i])
+        }
+        return actions
     }
 
     function actionVisible(action) {
@@ -117,6 +169,14 @@ Rectangle {
             }
         }
         return count
+    }
+
+    function dropPanelAnchorPoint(actionButton) {
+        var anchorPoint = actionButton.mapToItem(bottomStrip, actionButton.width / 2, 0)
+        if (actionButton.toolStripAction === flyActionList.modeActionItem) {
+            anchorPoint.x = bottomStrip.width / 2
+        }
+        return anchorPoint
     }
 
     function visibleToolActionCount() {
@@ -252,7 +312,7 @@ Rectangle {
                         verticalAlignment:      Text.AlignVCenter
                         fontSizeMode:           Text.HorizontalFit
                         minimumPointSize:       ScreenTools.captionFontPointSize
-                        elide:                  Text.ElideRight
+                        elide:                  Text.ElideNone
                         maximumLineCount:       1
                     }
 
@@ -323,17 +383,103 @@ Rectangle {
                     return
                 }
                 if (mainWindow.allowViewSwitch()) {
-                    dropPanel.hide()
+                    bottomStrip.hideDropPanelAndUnpin()
                     if (!actionButton.toolStripAction.dropPanelComponent) {
                         actionButton.toolStripAction.triggered(actionButton)
                     } else {
                         actionButton.checked = true
                         bottomStrip.clearOtherActionChecks(actionButton.actionIndex)
-                        var panelEdgeTopPoint = actionButton.mapToItem(bottomStrip, actionButton.width / 2, 0)
+                        var panelEdgeTopPoint = bottomStrip.dropPanelAnchorPoint(actionButton)
                         dropPanel.show(panelEdgeTopPoint, actionButton.toolStripAction.dropPanelComponent, actionButton)
                     }
                 } else if (actionButton.checkable) {
                     actionButton.checked = !actionButton.checked
+                }
+            }
+        }
+    }
+
+    component FavoriteModeGroup: Rectangle {
+        id: favoriteModeGroup
+
+        property var modes: []
+
+        visible:                modes && modes.length > 0
+        Layout.preferredWidth:  visible ? bottomStrip._favoriteModeGroupWidth : 0
+        Layout.minimumWidth:    Layout.preferredWidth
+        Layout.maximumWidth:    Layout.preferredWidth
+        Layout.fillHeight:      visible
+        radius:                 Math.round(ScreenTools.defaultFontPixelWidth * 0.36)
+        color:                  Qt.rgba(0.035, 0.040, 0.046, 0.46)
+        border.color:           Qt.rgba(0.82, 0.90, 0.95, 0.20)
+        border.width:           1
+
+        RowLayout {
+            id:                 favoriteModeRow
+            anchors.fill:       parent
+            anchors.margins:    bottomStrip._favoriteModeGroupPadding
+            spacing:            bottomStrip._favoriteModeGroupSpacing
+
+            Repeater {
+                model: favoriteModeGroup.modes
+
+                Rectangle {
+                    id: favoriteModeButton
+
+                    property var vehicle: flyActionList.activeVehicle
+                    property string modeName: modelData
+                    property string displayModeText: flightModeDisplay.modeText(vehicle, modeName, modeName)
+                    property bool activeMode: vehicle && vehicle.flightMode === modeName
+
+                    Layout.preferredWidth:  bottomStrip._favoriteModeButtonWidth
+                    Layout.minimumWidth:    Layout.preferredWidth
+                    Layout.maximumWidth:    Layout.preferredWidth
+                    Layout.fillHeight:      true
+                    radius:                 Math.round(ScreenTools.defaultFontPixelWidth * 0.24)
+                    color:                  favoriteModeMouse.pressed ? Qt.rgba(0.16, 0.20, 0.24, 0.72) :
+                                                (activeMode ? Qt.rgba(0.10, 0.56, 0.83, 0.16) :
+                                                 (favoriteModeMouse.containsMouse ? Qt.rgba(1, 1, 1, 0.08) : Qt.rgba(1, 1, 1, 0.025)))
+                    border.color:           activeMode ? qgcPal.primaryButton :
+                                                (favoriteModeMouse.containsMouse ? Qt.rgba(0.82, 0.90, 0.95, 0.20) : "transparent")
+                    border.width:           activeMode || favoriteModeMouse.containsMouse ? 1 : 0
+
+                    Item {
+                        id:                 favoriteModeTextHost
+                        anchors.fill:       parent
+                        anchors.margins:    ScreenTools.defaultFontPixelWidth * 0.28
+
+                        RowLayout {
+                            anchors.centerIn: parent
+
+                            QGCLabel {
+                                id:                     favoriteModeLabel
+                                Layout.preferredWidth:  Math.max(0, Math.min(implicitWidth, favoriteModeTextHost.width))
+                                Layout.maximumWidth:    Layout.preferredWidth
+                                text:                   flightModeDisplay.labelText(favoriteModeButton.displayModeText)
+                                color:                  favoriteModeButton.activeMode ? qgcPal.text : qgcPal.buttonText
+                                font.bold:              true
+                                font.pointSize:         ScreenTools.controlFontPointSize
+                                horizontalAlignment:    Text.AlignHCenter
+                                verticalAlignment:      Text.AlignVCenter
+                                fontSizeMode:           Text.HorizontalFit
+                                minimumPointSize:       ScreenTools.captionFontPointSize
+                                elide:                  Text.ElideNone
+                                maximumLineCount:       1
+                            }
+                        }
+                    }
+
+                    QGCMouseArea {
+                        id:             favoriteModeMouse
+                        anchors.fill:   parent
+                        hoverEnabled:   !ScreenTools.isMobile
+                        enabled:        favoriteModeButton.vehicle && favoriteModeButton.vehicle.flightModeSetAvailable
+                        onClicked: {
+                            if (mainWindow.allowViewSwitch()) {
+                                flyActionList.setFavoriteFlightMode(favoriteModeButton.modeName)
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -395,12 +541,28 @@ Rectangle {
                 spacing:            _rowSpacing
 
                 Repeater {
-                    id:     actionRepeater
-                    model:  flyActionList.model
+                    id:     leadingActionRepeater
+                    model:  bottomStrip.actionsThroughMode()
 
                     ActionButton {
                         toolStripAction: modelData
                         actionIndex:     index
+                    }
+                }
+
+                FavoriteModeGroup {
+                    id: favoriteModeGroupItem
+                    modes: flyActionList.activeVehicle && flyActionList.activeVehicle.flightModeSetAvailable ?
+                                flyActionList.favoriteModesForToolbar : []
+                }
+
+                Repeater {
+                    id:     trailingActionRepeater
+                    model:  bottomStrip.actionsAfterMode()
+
+                    ActionButton {
+                        toolStripAction: modelData
+                        actionIndex:     bottomStrip.modeActionIndex() + 1 + index
                     }
                 }
             }

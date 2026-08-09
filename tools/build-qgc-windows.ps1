@@ -157,9 +157,9 @@ function Invoke-Build {
 function Invoke-Deploy {
     Initialize-BuildEnvironment
 
-    $exe = Join-Path $BuildDir "$Config\QGroundControl.exe"
+    $exe = Join-Path $BuildDir "$Config\AeroFollow.exe"
     if (-not (Test-Path -LiteralPath $exe)) {
-        throw "QGroundControl.exe was not found at $exe. Build first."
+        throw "AeroFollow.exe was not found at $exe. Build first."
     }
 
     $deployMode = if ($Config -eq 'Debug') { '--debug' } else { '--release' }
@@ -173,9 +173,9 @@ function Invoke-Deploy {
 function Invoke-Run {
     Initialize-BuildEnvironment
 
-    $exe = Join-Path $BuildDir "$Config\QGroundControl.exe"
+    $exe = Join-Path $BuildDir "$Config\AeroFollow.exe"
     if (-not (Test-Path -LiteralPath $exe)) {
-        throw "QGroundControl.exe was not found at $exe. Build first."
+        throw "AeroFollow.exe was not found at $exe. Build first."
     }
 
     Push-Location (Split-Path -Parent $exe)

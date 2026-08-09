@@ -1324,42 +1324,42 @@
     <message>
       <location filename="../src/FirmwarePlugin/APM/ArduPlaneFirmwarePlugin.h" line="83"/>
       <source>QuadPlane Stabilize</source>
-      <translation>Q自稳</translation>
+      <translation>旋翼自稳</translation>
     </message>
     <message>
       <location filename="../src/FirmwarePlugin/APM/ArduPlaneFirmwarePlugin.h" line="84"/>
       <source>QuadPlane Hover</source>
-      <translation>Q定高悬停</translation>
+      <translation>旋翼定高悬停</translation>
     </message>
     <message>
       <location filename="../src/FirmwarePlugin/APM/ArduPlaneFirmwarePlugin.h" line="85"/>
       <source>QuadPlane Loiter</source>
-      <translation>Q定点悬停</translation>
+      <translation>旋翼定点悬停</translation>
     </message>
     <message>
       <location filename="../src/FirmwarePlugin/APM/ArduPlaneFirmwarePlugin.h" line="86"/>
       <source>QuadPlane Land</source>
-      <translation>Q降落</translation>
+      <translation>旋翼降落</translation>
     </message>
     <message>
       <location filename="../src/FirmwarePlugin/APM/ArduPlaneFirmwarePlugin.h" line="87"/>
       <source>QuadPlane RTL</source>
-      <translation>Q返航</translation>
+      <translation>旋翼返航</translation>
     </message>
     <message>
       <location filename="../src/FirmwarePlugin/APM/ArduPlaneFirmwarePlugin.h" line="88"/>
       <source>QuadPlane AutoTune</source>
-      <translation>Q自动调参</translation>
+      <translation>旋翼自动调参</translation>
     </message>
     <message>
       <location filename="../src/FirmwarePlugin/APM/ArduPlaneFirmwarePlugin.h" line="89"/>
       <source>QuadPlane Acro</source>
-      <translation>Q特技</translation>
+      <translation>旋翼特技</translation>
     </message>
     <message>
       <location filename="../src/FirmwarePlugin/APM/ArduPlaneFirmwarePlugin.h" line="90"/>
       <source>Thermal</source>
-      <translation>热气流</translation>
+      <translation>热气流盘旋</translation>
     </message>
     <message>
       <location filename="../src/FirmwarePlugin/APM/ArduPlaneFirmwarePlugin.h" line="91"/>
@@ -7056,7 +7056,7 @@ Click Ok to start the auto-tuning process.
     </message>
     <message>
       <source>Thermal</source>
-      <translation>热气流</translation>
+      <translation>热气流盘旋</translation>
     </message>
     <message>
       <source>Loiter to QLand</source>
@@ -7073,31 +7073,31 @@ Click Ok to start the auto-tuning process.
     </message>
     <message>
       <source>QuadPlane Stabilize</source>
-      <translation>Q自稳</translation>
+      <translation>旋翼自稳</translation>
     </message>
     <message>
       <source>QuadPlane Hover</source>
-      <translation>Q定高悬停</translation>
+      <translation>旋翼定高悬停</translation>
     </message>
     <message>
       <source>QuadPlane Loiter</source>
-      <translation>Q定点悬停</translation>
+      <translation>旋翼定点悬停</translation>
     </message>
     <message>
       <source>QuadPlane Land</source>
-      <translation>Q降落</translation>
+      <translation>旋翼降落</translation>
     </message>
     <message>
       <source>QuadPlane RTL</source>
-      <translation>Q返航</translation>
+      <translation>旋翼返航</translation>
     </message>
     <message>
       <source>QuadPlane AutoTune</source>
-      <translation>Q自动调参</translation>
+      <translation>旋翼自动调参</translation>
     </message>
     <message>
       <source>QuadPlane Acro</source>
-      <translation>Q特技</translation>
+      <translation>旋翼特技</translation>
     </message>
   </context>
   <context>
@@ -7207,6 +7207,18 @@ Click Ok to start the auto-tuning process.
       <location filename="../src/FlightDisplay/FlyViewToolStripActionList.qml" line="128"/>
       <source>Circle</source>
       <translation>绕圈</translation>
+    </message>
+    <message>
+      <source>Flight Modes</source>
+      <translation>飞行模式</translation>
+    </message>
+    <message>
+      <source>Pin mode list</source>
+      <translation>固定模式列表</translation>
+    </message>
+    <message>
+      <source>Unpin mode list</source>
+      <translation>取消固定模式列表</translation>
     </message>
   </context>
   <context>
@@ -19129,8 +19141,8 @@ ROTATION_NONE 表示组件指向飞行方向。</translation>
     <name>VehicleMapItem</name>
     <message>
       <location filename="../src/FlightMap/MapItems/VehicleMapItem.qml" line="147"/>
-      <source>Vehicle %1</source>
-      <translation>载具%1</translation>
+      <source>Vehicle #%1</source>
+      <translation>载具#%1</translation>
     </message>
     <message>
       <location filename="../src/FlightMap/MapItems/VehicleMapItem.qml" line="45"/>

@@ -23,6 +23,7 @@ Item {
     property real   viewportMargins:    0
     property var    toolStrip
     property bool   allowOutsideParent: false
+    property bool   keepOpenOnOutsideClick: false
     property var    backdropSourceItem: toolStrip && toolStrip.backdropSourceItem !== undefined ? toolStrip.backdropSourceItem : null
 
     // Should be an enum but that get's into the whole problem of creating a singleton which isn't worth the effort
@@ -44,6 +45,7 @@ Item {
     property real   _viewportMaxHeight: _viewportMaxBottom - _viewportMaxTop
     property var    _dropPanelCancel
     property var    _parentButton
+    readonly property bool _framelessPanel: panelLoader.item && panelLoader.item.frameless === true
 
     function show(panelEdgeTopPoint, panelComponent, parentButton) {
         _parentButton = parentButton
@@ -72,7 +74,10 @@ Item {
 
         if (allowOutsideParent) {
             var viewportWidth = parent && parent.parent ? parent.parent.width : parent.width
-            dropDownItem.x = Math.max(0, Math.min(_dropEdgeTopPoint.x - (dropDownItem.width / 2), viewportWidth - dropDownItem.width))
+            var parentOffsetX = parent && parent.parent ? parent.x : 0
+            var absoluteDropX = _dropEdgeTopPoint.x + parentOffsetX - (dropDownItem.width / 2)
+            absoluteDropX = Math.max(0, Math.min(absoluteDropX, viewportWidth - dropDownItem.width))
+            dropDownItem.x = absoluteDropX - parentOffsetX
             dropDownItem.y = _dropEdgeTopPoint.y - dropDownItem.height - (_dropMargin * 0.55)
         } else {
             dropDownItem.x = _dropEdgeTopPoint.x + _dropMargin
@@ -105,7 +110,8 @@ Item {
         MouseArea {
             anchors.fill:   parent
             z:              toolStrip.z - 1
-            onClicked:      dropPanel.hide()
+            enabled:        !_root.keepOpenOnOutsideClick
+            onClicked:      _root.hide()
         }
     }
 
@@ -148,9 +154,10 @@ Item {
             x:                      _arrowPointWidth
             width:                  Math.max(1, parent.width - _arrowPointWidth)
             height:                 parent.height
+            visible:                !_root._framelessPanel
             sourceItem:             _root.backdropSourceItem
             targetItem:             panelGlass
-            backdropBlurEnabled:    _root.visible && !!_root.backdropSourceItem
+            backdropBlurEnabled:    visible && _root.visible && !!_root.backdropSourceItem
             cornerRadius:           Math.min(ScreenTools.defaultFontPixelWidth * 0.85, width / 2, height / 2)
         }
 
@@ -158,6 +165,7 @@ Item {
             x:              _arrowPointWidth
             width:          Math.max(1, parent.width - _arrowPointWidth)
             height:         parent.height
+            visible:        !_root._framelessPanel
             radius:         Math.min(ScreenTools.defaultFontPixelWidth * 0.85, width / 2, height / 2)
             color:          "transparent"
             border.color:   Qt.rgba(0.82, 0.90, 0.95, 0.14)
@@ -170,6 +178,7 @@ Item {
             anchors.leftMargin: _dropMargin + _arrowPointWidth
             anchors.fill:       parent
             flickableDirection: Flickable.VerticalFlick
+            interactive:        contentHeight > height
             contentWidth:       panelLoader.width
             contentHeight:      panelLoader.height
 
