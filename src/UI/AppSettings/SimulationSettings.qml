@@ -64,17 +64,25 @@ SettingsPage {
             }
 
             QGCButton {
-                text: qsTr("停止仿真")
+                text: qsTr("停止小车仿真")
+                enabled: _simulator.targetRunning
+                onClicked: _simulator.stopTargetSimulation()
+            }
+
+            QGCButton {
+                text: qsTr("停止全部仿真")
                 enabled: _simulator.running
                 onClicked: _simulator.stopTraining()
             }
 
-            QGCLabel {
-                Layout.fillWidth: true
-                text: _simulator.statusText
-                color: _simulator.running ? qgcPal.colorGreen : qgcPal.text
-                font.bold: true
-            }
+        }
+
+        QGCLabel {
+            Layout.fillWidth: true
+            text: _simulator.statusText
+            color: _simulator.running ? qgcPal.colorGreen : qgcPal.text
+            font.bold: true
+            wrapMode: Text.WordWrap
         }
 
         QGCLabel {

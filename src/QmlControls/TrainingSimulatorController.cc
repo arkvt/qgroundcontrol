@@ -116,7 +116,7 @@ QString TrainingSimulatorController::statusText() const
         return tr("飞机与小车仿真正在运行");
     }
     if (planeRunning()) {
-        return tr("飞机仿真正在运行，等待小车脚本");
+        return tr("飞机仿真正在运行，小车仿真已停止");
     }
     if (targetRunning()) {
         return tr("小车脚本正在运行，等待飞机 SITL");
@@ -351,6 +351,23 @@ void TrainingSimulatorController::stopTraining()
     _stopPlaneProcess();
     _restoreQgcConfiguration();
     _setCleanupRequired(false);
+    _stopping = false;
+    emit runningChanged();
+}
+
+void TrainingSimulatorController::stopTargetSimulation()
+{
+    if (_stopping || !targetRunning()) {
+        return;
+    }
+
+    _stopping = true;
+    _stopTargetProcess();
+    _appendLog(tr("系统"), tr("小车仿真已停止，飞机仿真继续运行。\n").toUtf8());
+    if (!planeRunning()) {
+        _restoreQgcConfiguration();
+        _setCleanupRequired(false);
+    }
     _stopping = false;
     emit runningChanged();
 }

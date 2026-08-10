@@ -82,6 +82,7 @@ public:
 
     Q_INVOKABLE bool startTraining();
     Q_INVOKABLE bool checkEnvironment();
+    Q_INVOKABLE void stopTargetSimulation();
     Q_INVOKABLE void stopTraining();
     Q_INVOKABLE void clearLog();
 

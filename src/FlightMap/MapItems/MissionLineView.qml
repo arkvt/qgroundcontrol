@@ -18,7 +18,7 @@ import QGroundControl.Palette
 MapItemView {
     property bool showSpecialVisual: false
     delegate: MapPolyline {
-        line.width: 4
+        line.width: 8
         // Note: Special visuals for ROI are hacked out for now since they are not working correctly
         line.color: _terrainCollision ?
                         "red" :
