@@ -171,6 +171,8 @@ private:
     /// Set the value for the specified piece of information
     void _setInfoValue(const QString& key, const QVariant& value) { _infoMap[key] = value; }
 
+    static QString _translatedAdvancedCategory();
+
     /// Overrides the existing values with new ui info
     ///     @param uiInfo New ui info to override existing info
     void _overrideInfo(MissionCommandUIInfo* uiInfo);

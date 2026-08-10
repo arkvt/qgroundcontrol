@@ -12,6 +12,8 @@
 #include "FactMetaData.h"
 #include "QGCLoggingCategory.h"
 
+#include <QtCore/QTranslator>
+
 QGC_LOGGING_CATEGORY(MissionCommandsLog, "MissionCommandsLog")
 
 MissionCmdParamInfo::MissionCmdParamInfo(QObject* parent)
@@ -74,8 +76,14 @@ QString MissionCommandUIInfo::category(void) const
     if (_infoMap.contains(_categoryJsonKey)) {
         return _infoMap[_categoryJsonKey].toString();
     } else {
-        return _advancedCategory;
+        return _translatedAdvancedCategory();
     }
+}
+
+QString MissionCommandUIInfo::_translatedAdvancedCategory()
+{
+    const QString translatedCategory = JsonHelper::translator()->translate("MavCmdInfoCommon.json", _advancedCategory);
+    return translatedCategory.isEmpty() ? QString::fromLatin1(_advancedCategory) : translatedCategory;
 }
 
 QString MissionCommandUIInfo::description(void) const
@@ -288,7 +296,7 @@ bool MissionCommandUIInfo::loadJsonInfo(const QJsonObject& jsonObject, bool requ
     if (requireFullObject) {
         // Since this is the base of the hierarchy it must contain valid defaults for all values.
         if (!_infoAvailable(_categoryJsonKey)) {
-            _setInfoValue(_categoryJsonKey, _advancedCategory);
+            _setInfoValue(_categoryJsonKey, _translatedAdvancedCategory());
         }
         if (!_infoAvailable(_friendlyNameJsonKey)) {
             _setInfoValue(_friendlyNameJsonKey, _infoValue(_rawNameJsonKey));
