@@ -43,6 +43,15 @@ Item {
     property int threshold1: _batterySettings.threshold1.rawValue
     property int threshold2: _batterySettings.threshold2.rawValue   
 
+    function batteryCapacityParameterName(battery) {
+        if (!battery || !battery.id || isNaN(battery.id.rawValue)) {
+            return ""
+        }
+
+        const batteryNumber = Math.round(Number(battery.id.rawValue)) + 1
+        return batteryNumber === 1 ? "BATT_CAPACITY" : "BATT" + batteryNumber + "_CAPACITY"
+    }
+
     Row {
         id:             batteryIndicatorRow
         anchors.top:    parent.top
@@ -202,6 +211,10 @@ Item {
         ColumnLayout {
             spacing: ScreenTools.defaultFontPixelHeight / 2
 
+            FactPanelController {
+                id: batteryFactController
+            }
+
             Component {
                 id: batteryValuesAvailableComponent
 
@@ -226,6 +239,9 @@ Item {
                     showDividers:   false
 
                     property var batteryValuesAvailable: batteryValuesAvailableLoader.item
+                    property string capacityParameterName: control.batteryCapacityParameterName(object)
+                    property bool capacityParameterAvailable: capacityParameterName !== "" && batteryFactController.parameterExists(-1, capacityParameterName)
+                    property Fact capacityFact: capacityParameterAvailable ? batteryFactController.getParameterFact(-1, capacityParameterName, false /* reportMissing */) : null
 
                     Loader {
                         id:                 batteryValuesAvailableLoader
@@ -255,6 +271,12 @@ Item {
                     LabelledLabel {
                         label:      qsTr("Voltage")
                         labelText:  object.voltage.valueString + " " + object.voltage.units
+                    }
+
+                    LabelledLabel {
+                        label:      qsTr("Capacity")
+                        labelText:  capacityFact ? capacityFact.valueString + " " + capacityFact.units : ""
+                        visible:    capacityFact !== null
                     }
 
                     LabelledLabel {

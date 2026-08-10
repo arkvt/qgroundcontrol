@@ -27,9 +27,12 @@ import QGroundControl.ScreenTools
 QGCButton {
     property string name:                           ""
     property string manualText:                     ""      ///< text to show for a manual check, "" signals no manual check
+    property string passedText:                     qsTr("Passed")
     property string telemetryTextFailure                    ///< text to show if telemetry check failed (override not allowed)
     property bool   telemetryFailure:               false   ///< true: telemetry check failing, false: telemetry check passing
     property bool   allowTelemetryFailureOverride:  false   ///< true: user can click past telemetry failure
+    property bool   preserveTextOnPass:              false   ///< true: keep the check text instead of replacing it with "Passed"
+    property bool   descriptionOnNewLine:            false   ///< true: place status/description below the check name
     property bool   passed:                         _manualState === _statePassed && _telemetryState === _statePassed
     property bool   failed:                         _manualState === _stateFailed || _telemetryState === _stateFailed
 
@@ -47,10 +50,13 @@ QGCButton {
     readonly property color _pendingColor:  "#f7a81f"
     readonly property color _failedColor:   "#c31818"
 
-    property string _text: "<b>" + name +"</b>: " +
-                           ((_telemetryState !== _statePassed) ?
-                               telemetryTextFailure :
-                               (_manualState !== _statePassed ? manualText : qsTr("Passed")))
+    property string _statusText: (_telemetryState !== _statePassed) ?
+                                     telemetryTextFailure :
+                                     (_manualState !== _statePassed ?
+                                         manualText :
+                                         (preserveTextOnPass ? manualText : passedText))
+    property string _text:       "<b>" + name + "</b>" +
+                                 (_statusText !== "" ? (descriptionOnNewLine ? "<br>" : ": ") + _statusText : "")
     property color  _color: _telemetryState === _statePassed && _manualState === _statePassed ?
                                 _passedColor :
                                 (_telemetryState == _stateFailed ?
@@ -95,7 +101,7 @@ QGCButton {
 
     contentItem: QGCLabel {
         wrapMode:               Text.WordWrap
-        horizontalAlignment:    Text.AlignHCenter
+        horizontalAlignment:    descriptionOnNewLine ? Text.AlignLeft : Text.AlignHCenter
         color:                  qgcPal.buttonText
         text:                   _text
     }

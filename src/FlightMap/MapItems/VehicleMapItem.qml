@@ -18,6 +18,7 @@ import QGroundControl.ScreenTools
 import QGroundControl.Vehicle
 import QGroundControl.Controls
 import QGroundControl.Palette
+import QGroundControl.FlightDisplay
 
 /// Marker for displaying a vehicle location on the map
 MapQuickItem {
@@ -55,6 +56,7 @@ MapQuickItem {
     }
 
     QGCPalette { id: qgcPal }
+    FlightModeDisplay { id: flightModeDisplay }
 
     function factText(fact, fallbackText) {
         if (!fact || fact.valueString === undefined) {
@@ -118,7 +120,7 @@ MapQuickItem {
     }
 
     function deviceTitleText(vehicle) {
-        return vehicle ? qsTr("Vehicle %1").arg(vehicle.id) : qsTr("Unknown")
+        return vehicle ? qsTr("Vehicle #%1").arg(vehicle.id) : qsTr("Unknown")
     }
 
     function vehicleStatusText(vehicle) {
@@ -325,13 +327,13 @@ MapQuickItem {
             id:         vehicleInfoCard
             z:          10
             visible:    _root.showInfoCard && !_adsbVehicle && vehicle && _root.infoPinned
-            width:      Math.max(ScreenTools.defaultFontPixelWidth * 15.4, infoLayout.implicitWidth + vehicleItem._cardPaddingX * 2)
+            width:      Math.max(ScreenTools.defaultFontPixelWidth * 18.2, infoLayout.implicitWidth + vehicleItem._cardPaddingX * 2)
             height:     infoLayout.implicitHeight + vehicleItem._cardPaddingY * 2
             x:          vehicleItem._cardOnLeft ? -width - vehicleItem._cardGap : vehicleIcon.width + vehicleItem._cardGap
             y:          Math.round((vehicleIcon.height - height) / 2)
             radius:     Math.round(ScreenTools.defaultFontPixelWidth * 0.58)
-            color:      qgcPal.window
-            border.color: qgcPal.groupBorder
+            color:      Qt.rgba(0.035, 0.040, 0.048, 0.76)
+            border.color: Qt.rgba(0.82, 0.90, 0.95, 0.24)
             border.width: 1
             clip:       true
 
@@ -345,22 +347,36 @@ MapQuickItem {
                     Layout.fillWidth:   true
                     spacing:            ScreenTools.defaultFontPixelWidth * 0.55
 
-                    QGCLabel {
-                        Layout.fillWidth:       true
-                        text:                   _root.deviceTitleText(vehicle)
-                        color:                  qgcPal.text
-                        font.bold:              true
-                        font.pointSize:         ScreenTools.labelFontPointSize
-                        elide:                  Text.ElideRight
+                    RowLayout {
+                        Layout.fillWidth:   true
+                        spacing:            ScreenTools.defaultFontPixelWidth * 0.58
+
+                        QGCLabel {
+                            text:                   _root.deviceTitleText(_root.vehicle)
+                            color:                  qgcPal.text
+                            font.bold:              true
+                            font.pointSize:         ScreenTools.labelFontPointSize
+                        }
+
+                        QGCLabel {
+                            Layout.fillWidth:       true
+                            text:                   flightModeDisplay.modeText(_root.vehicle, _root.vehicle ? _root.vehicle.flightMode : "", "--")
+                            color:                  qgcPal.text
+                            opacity:                0.92
+                            font.bold:              true
+                            font.pointSize:         ScreenTools.captionFontPointSize
+                            horizontalAlignment:    Text.AlignLeft
+                            elide:                  Text.ElideRight
+                        }
                     }
 
                     QGCLabel {
                         id:                     statusLabel
                         Layout.alignment:       Qt.AlignVCenter
-                        Layout.preferredWidth:  Math.min(implicitWidth, ScreenTools.defaultFontPixelWidth * 8)
-                        text:                   _root.vehicleStatusText(vehicle)
+                        Layout.preferredWidth:  Math.min(implicitWidth, ScreenTools.defaultFontPixelWidth * 6.5)
+                        text:                   _root.vehicleStatusText(_root.vehicle)
                         color:                  qgcPal.text
-                        opacity:                0.82
+                        opacity:                0.88
                         font.bold:              true
                         font.pointSize:         ScreenTools.captionFontPointSize
                         horizontalAlignment:    Text.AlignRight

@@ -34,9 +34,9 @@ Rectangle {
     property real   _segmentPadding:    ScreenTools.defaultFontPixelWidth * 0.75
     property real   _topControlHeight:  _root.height * 0.74
     property var    _batterySettings:   QGroundControl.settingsManager.batteryIndicatorSettings
-    property int    _batteryDisplayMode: _batterySettings ? _batterySettings.valueDisplay.rawValue : 0
     property bool   _showBatteryTopIndicator: _activeVehicle && _activeVehicle.batteries && _activeVehicle.batteries.count > 0
     property bool   _showGpsTopIndicator: _activeVehicle !== null && _activeVehicle !== undefined
+    property int    _gpsPeakSatelliteCount: 0
     property bool   _showRightBranding: false
 
     function dropMainStatusIndicatorTool() {
@@ -71,49 +71,22 @@ Rectangle {
         return fact.valueString + (fact.units && fact.units !== "" ? " " + fact.units : "")
     }
 
-    function batteryPercentText(vehicle) {
-        var battery = firstBattery(vehicle)
-        if (battery) {
-            if (battery && !isNaN(battery.percentRemaining.rawValue)) {
-                return battery.percentRemaining.valueString + battery.percentRemaining.units
-            }
-        }
-        return qsTr("N/A")
+    function gpsAvailable(vehicle) {
+        return vehicle && vehicle.gps
     }
 
-    function firstBattery(vehicle) {
-        if (vehicle && vehicle.batteries && vehicle.batteries.count > 0) {
-            return vehicle.batteries.get(0)
+    function batteryText(battery) {
+        if (battery && !isNaN(battery.percentRemaining.rawValue)) {
+            return battery.percentRemaining.rawValue > 98.9 ? qsTr("100%") :
+                                                               battery.percentRemaining.valueString + battery.percentRemaining.units
         }
-        return null
-    }
-
-    function batteryVoltageText(vehicle) {
-        var battery = firstBattery(vehicle)
         if (battery && !isNaN(battery.voltage.rawValue)) {
             return battery.voltage.valueString + battery.voltage.units
         }
         return qsTr("N/A")
     }
 
-    function batteryCurrentText(vehicle) {
-        var battery = firstBattery(vehicle)
-        if (battery && battery.current && !isNaN(battery.current.rawValue)) {
-            return battery.current.valueString + " " + battery.current.units
-        }
-        return qsTr("N/A")
-    }
-
-    function batteryPrimaryText(vehicle) {
-        return _batteryDisplayMode === 1 ? batteryVoltageText(vehicle) : batteryPercentText(vehicle)
-    }
-
-    function batterySecondaryText(vehicle) {
-        return _batteryDisplayMode === 2 ? batteryVoltageText(vehicle) : ""
-    }
-
-    function batteryIconColor(vehicle) {
-        var battery = firstBattery(vehicle)
+    function batteryColor(battery) {
         if (!battery || isNaN(battery.percentRemaining.rawValue)) {
             return qgcPal.buttonText
         }
@@ -126,35 +99,22 @@ Rectangle {
         return qgcPal.colorGreen
     }
 
-    function batteryDetailText(vehicle) {
-        var battery = firstBattery(vehicle)
-        if (battery) {
-            var parts = []
-            if (battery && !isNaN(battery.percentRemaining.rawValue)) {
-                parts.push(battery.percentRemaining.valueString + battery.percentRemaining.units)
-            }
-            if (battery && !isNaN(battery.voltage.rawValue)) {
-                parts.push(battery.voltage.valueString + " " + battery.voltage.units)
-            }
-            if (battery && battery.current && !isNaN(battery.current.rawValue)) {
-                parts.push(battery.current.valueString + " " + battery.current.units)
-            }
-            if (parts.length > 0) {
-                return parts.join("   ")
-            }
-        }
-        return qsTr("N/A")
-    }
-
-    function gpsAvailable(vehicle) {
-        return vehicle && vehicle.gps
-    }
-
     function gpsSatelliteText(vehicle) {
-        if (!gpsAvailable(vehicle) || isNaN(vehicle.gps.count.value)) {
-            return ""
+        if (!gpsAvailable(vehicle) || isNaN(vehicle.gps.count.rawValue)) {
+            return qsTr("N/A")
         }
-        return vehicle.gps.count.valueString
+        var currentCount = Math.max(0, Math.round(Number(vehicle.gps.count.rawValue)))
+        return currentCount.toString() + "/" + Math.max(currentCount, _gpsPeakSatelliteCount).toString()
+    }
+
+    function updateGpsPeakSatelliteCount() {
+        if (!gpsAvailable(_activeVehicle) || isNaN(_activeVehicle.gps.count.rawValue)) {
+            return
+        }
+        var currentCount = Math.max(0, Math.round(Number(_activeVehicle.gps.count.rawValue)))
+        if (currentCount > _gpsPeakSatelliteCount) {
+            _gpsPeakSatelliteCount = currentCount
+        }
     }
 
     function gpsHdopText(vehicle) {
@@ -213,6 +173,36 @@ Rectangle {
         _mainStatusBGColor = qgcPal.colorGreen
         return qsTr("Ready")
     }
+
+    Connections {
+        target: QGroundControl.multiVehicleManager
+
+        function onActiveVehicleChanged() {
+            _gpsPeakSatelliteCount = 0
+            Qt.callLater(updateGpsPeakSatelliteCount)
+        }
+    }
+
+    Connections {
+        target: gpsAvailable(_activeVehicle) ? _activeVehicle.gps.count : null
+
+        function onRawValueChanged() {
+            updateGpsPeakSatelliteCount()
+        }
+    }
+
+    Connections {
+        target: _activeVehicle ? _activeVehicle.vehicleLinkManager : null
+
+        function onCommunicationLostChanged() {
+            _gpsPeakSatelliteCount = 0
+            if (_activeVehicle && !_activeVehicle.vehicleLinkManager.communicationLost) {
+                Qt.callLater(updateGpsPeakSatelliteCount)
+            }
+        }
+    }
+
+    Component.onCompleted: updateGpsPeakSatelliteCount()
 
     QGCPalette { id: qgcPal }
 
@@ -330,8 +320,7 @@ Rectangle {
         property string secondaryText: ""
         property var    drawerComponent: null
         property real   _iconSize: _root.height * 0.56
-        property real   _textWidth: Math.max(primaryLabel.visible ? primaryLabel.implicitWidth : 0,
-                                             secondaryLabel.visible ? secondaryLabel.implicitWidth : 0)
+        property real   _textWidth: primaryText !== "" || secondaryText !== "" ? ScreenTools.defaultFontPixelWidth * 6.5 : 0
         property real   _textGap: _textWidth > 0 ? ScreenTools.defaultFontPixelWidth * 0.42 : 0
 
         implicitWidth:          _iconSize + _textGap + _textWidth
@@ -385,41 +374,6 @@ Rectangle {
             anchors.fill:   parent
             enabled:        indicator.drawerComponent !== null
             onClicked:      mainWindow.showIndicatorDrawer(indicator.drawerComponent, indicator)
-        }
-    }
-
-    Component {
-        id: batteryTopIndicatorPage
-
-        ToolIndicatorPage {
-            showExpand:         false
-            waitForParameters:  false
-            contentComponent:   batteryTopIndicatorContent
-        }
-    }
-
-    Component {
-        id: batteryTopIndicatorContent
-
-        SettingsGroupLayout {
-            heading:        qsTr("Battery Status")
-            contentSpacing: 0
-            showDividers:   false
-
-            LabelledLabel {
-                label:      qsTr("Remaining")
-                labelText:  batteryPercentText(_activeVehicle)
-            }
-
-            LabelledLabel {
-                label:      qsTr("Voltage")
-                labelText:  batteryVoltageText(_activeVehicle)
-            }
-
-            LabelledLabel {
-                label:      qsTr("Current")
-                labelText:  batteryCurrentText(_activeVehicle)
-            }
         }
     }
 
@@ -507,26 +461,15 @@ Rectangle {
         }
 
         BarDivider {
-            visible: _showBatteryTopIndicator || _showGpsTopIndicator
+            visible: _showGpsTopIndicator
         }
 
         Row {
-            id:                     topBarIndicators
+            id:                     gpsTopBarIndicators
             Layout.alignment:       Qt.AlignVCenter
             Layout.preferredWidth:  visible ? implicitWidth : 0
             Layout.fillHeight:      true
-            spacing:                _showBatteryTopIndicator && _showGpsTopIndicator ? ScreenTools.defaultFontPixelWidth * 1.05 : 0
-            visible:                _showBatteryTopIndicator || _showGpsTopIndicator
-
-            TopBarIndicator {
-                id:             batteryTopBarIndicator
-                visible:        _showBatteryTopIndicator
-                iconSource:     "/qmlimages/Battery.svg"
-                iconColor:      batteryIconColor(_activeVehicle)
-                primaryText:    batteryPrimaryText(_activeVehicle)
-                secondaryText:  batterySecondaryText(_activeVehicle)
-                drawerComponent: batteryTopIndicatorPage
-            }
+            visible:                _showGpsTopIndicator
 
             TopBarIndicator {
                 id:             gpsTopBarIndicator
@@ -540,13 +483,13 @@ Rectangle {
         }
 
         BarDivider {
-            visible: _showBatteryTopIndicator || _showGpsTopIndicator
+            visible: _showGpsTopIndicator
         }
 
         InfoSegment {
             label:        qsTr("Altitude")
             value:        factText(_activeVehicle ? _activeVehicle.altitudeRelative : null, qsTr("N/A"))
-            minimumWidth: ScreenTools.defaultFontPixelWidth * 10.2
+            minimumWidth: ScreenTools.defaultFontPixelWidth * 8.5
         }
 
         BarDivider { }
@@ -554,7 +497,7 @@ Rectangle {
         InfoSegment {
             label:        qsTr("Ground Speed")
             value:        factText(_activeVehicle ? _activeVehicle.groundSpeed : null, qsTr("N/A"))
-            minimumWidth: ScreenTools.defaultFontPixelWidth * 12.2
+            minimumWidth: ScreenTools.defaultFontPixelWidth * 10.0
         }
 
         BarDivider { }
@@ -562,10 +505,69 @@ Rectangle {
         InfoSegment {
             label:        qsTr("Flight Time")
             value:        factText(_activeVehicle ? _activeVehicle.flightTime : null, qsTr("00:00:00"))
-            minimumWidth: ScreenTools.defaultFontPixelWidth * 12.2
+            minimumWidth: ScreenTools.defaultFontPixelWidth * 10.0
         }
 
         BarDivider { }
+
+        Item {
+            id:                     batteryTopBarIndicatorHolder
+            Layout.alignment:       Qt.AlignVCenter
+            Layout.minimumWidth:    visible ? batteryIndicatorRow.implicitWidth : 0
+            Layout.preferredWidth:  visible ? batteryIndicatorRow.implicitWidth : 0
+            Layout.fillHeight:      true
+            visible:                _showBatteryTopIndicator
+
+            Row {
+                id:                     batteryIndicatorRow
+                anchors.top:            parent.top
+                anchors.bottom:         parent.bottom
+                spacing:                ScreenTools.defaultFontPixelWidth * 0.55
+
+                Repeater {
+                    model: _activeVehicle ? _activeVehicle.batteries : 0
+
+                    Row {
+                        id:                     batteryCell
+                        anchors.top:            parent.top
+                        anchors.bottom:         parent.bottom
+                        spacing:                ScreenTools.defaultFontPixelWidth * 0.25
+
+                        property var battery: object
+
+                        QGCColoredImage {
+                            anchors.verticalCenter: parent.verticalCenter
+                            width:                  _root.height * 0.40
+                            height:                 width
+                            sourceSize.width:       width
+                            sourceSize.height:      height
+                            source:                 "/qmlimages/Battery.svg"
+                            fillMode:               Image.PreserveAspectFit
+                            color:                  batteryColor(batteryCell.battery)
+                        }
+
+                        QGCLabel {
+                            anchors.verticalCenter: parent.verticalCenter
+                            text:                   batteryText(batteryCell.battery)
+                            color:                  qgcPal.text
+                            font.bold:              true
+                            font.pointSize:         ScreenTools.defaultFontPointSize
+                        }
+                    }
+                }
+            }
+
+            BatteryIndicator {
+                id:                 batteryTopBarIndicator
+                anchors.fill:       parent
+                waitForParameters:  false
+                opacity:            0
+            }
+        }
+
+        BarDivider {
+            visible: _showBatteryTopIndicator
+        }
 
         Item {
             Layout.fillWidth: true

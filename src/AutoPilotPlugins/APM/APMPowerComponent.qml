@@ -37,13 +37,18 @@ SetupPage {
 
             property Fact _batt1Monitor:            controller.getParameterFact(-1, "BATT_MONITOR")
             property Fact _batt2Monitor:            controller.getParameterFact(-1, "BATT2_MONITOR", false /* reportMissing */)
+            property Fact _batt3Monitor:            controller.getParameterFact(-1, "BATT3_MONITOR", false /* reportMissing */)
             property bool _batt2MonitorAvailable:   controller.parameterExists(-1, "BATT2_MONITOR")
+            property bool _batt3MonitorAvailable:   controller.parameterExists(-1, "BATT3_MONITOR")
             property bool _batt1MonitorEnabled:     _batt1Monitor.rawValue !== 0
             property bool _batt2MonitorEnabled:     _batt2MonitorAvailable && _batt2Monitor.rawValue !== 0
+            property bool _batt3MonitorEnabled:     _batt3MonitorAvailable && _batt3Monitor.rawValue !== 0
             property bool _batt1ParamsAvailable:    controller.parameterExists(-1, "BATT_CAPACITY")
             property bool _batt2ParamsAvailable:    controller.parameterExists(-1, "BATT2_CAPACITY")
+            property bool _batt3ParamsAvailable:    controller.parameterExists(-1, "BATT3_CAPACITY")
             property bool _showBatt1Reboot:         _batt1MonitorEnabled && !_batt1ParamsAvailable
             property bool _showBatt2Reboot:         _batt2MonitorEnabled && !_batt2ParamsAvailable
+            property bool _showBatt3Reboot:         _batt3MonitorEnabled && !_batt3ParamsAvailable
             property bool _escCalibrationAvailable: controller.parameterExists(-1, "ESC_CALIBRATION")
             property Fact _escCalibration:          controller.getParameterFact(-1, "ESC_CALIBRATION", false /* reportMissing */)
 
@@ -219,6 +224,91 @@ SetupPage {
                         property Fact battVoltMult:     controller.getParameterFact(-1, "BATT2_VOLT_MULT", false /* reportMissing */)
                         property Fact battVoltPin:      controller.getParameterFact(-1, "BATT2_VOLT_PIN", false /* reportMissing */)
                         property FactGroup  _batteryFactGroup:  batt2FullSettings.visible ? controller.vehicle.getFactGroup("battery1") : null
+                        property Fact vehicleVoltage:   _batteryFactGroup ? _batteryFactGroup.voltage : null
+                        property Fact vehicleCurrent:   _batteryFactGroup ? _batteryFactGroup.current : null
+                    }
+                }
+            }
+
+            // Battery3 Monitor settings only - used when only monitor param is available
+            Column {
+                spacing: _margins / 2
+                visible: _batt3MonitorAvailable && (!_batt3MonitorEnabled || !_batt3ParamsAvailable)
+
+                QGCLabel {
+                    text:       qsTr("Battery 3")
+                    font.bold:   true
+                }
+
+                Rectangle {
+                    width:  batt3Column.x + batt3Column.width + _margins
+                    height: batt3Column.y + batt3Column.height + _margins
+                    color:  ggcPal.windowShade
+
+                    ColumnLayout {
+                        id:                 batt3Column
+                        anchors.margins:    _margins
+                        anchors.top:        parent.top
+                        anchors.left:       parent.left
+                        spacing:            ScreenTools.defaultFontPixelWidth
+
+                        RowLayout {
+                            spacing: ScreenTools.defaultFontPixelWidth
+
+                            QGCLabel { text: qsTr("Battery3 monitor:") }
+                            FactComboBox {
+                                fact:           _batt3Monitor
+                                indexModel:     false
+                                sizeToContents: true
+                            }
+                        }
+
+                        QGCLabel {
+                            text:       _restartRequired
+                            visible:    _showBatt3Reboot
+                        }
+
+                        QGCButton {
+                            text:       qsTr("Reboot vehicle")
+                            visible:    _showBatt3Reboot
+                            onClicked:  controller.vehicle.rebootVehicle()
+                        }
+                    }
+                }
+            }
+
+            // Battery 3 settings - Used when full params are available
+            Column {
+                id:         batt3FullSettings
+                spacing:    _margins / 2
+                visible:    _batt3MonitorEnabled && _batt3ParamsAvailable
+
+                QGCLabel {
+                    text:       qsTr("Battery 3")
+                    font.bold:   true
+                }
+
+                Rectangle {
+                    width:  battery3Loader.x + battery3Loader.width + _margins
+                    height: battery3Loader.y + battery3Loader.height + _margins
+                    color:  ggcPal.windowShade
+
+                    Loader {
+                        id:                 battery3Loader
+                        anchors.margins:    _margins
+                        anchors.top:        parent.top
+                        anchors.left:       parent.left
+                        sourceComponent:    batt3FullSettings.visible ? powerSetupComponent : undefined
+
+                        property Fact armVoltMin:       controller.getParameterFact(-1, "r.BATT3_ARM_VOLT", false /* reportMissing */)
+                        property Fact battAmpPerVolt:   controller.getParameterFact(-1, "r.BATT3_AMP_PERVLT", false /* reportMissing */)
+                        property Fact battAmpOffset:    controller.getParameterFact(-1, "BATT3_AMP_OFFSET", false /* reportMissing */)
+                        property Fact battCapacity:     controller.getParameterFact(-1, "BATT3_CAPACITY", false /* reportMissing */)
+                        property Fact battCurrPin:      controller.getParameterFact(-1, "BATT3_CURR_PIN", false /* reportMissing */)
+                        property Fact battMonitor:      controller.getParameterFact(-1, "BATT3_MONITOR", false /* reportMissing */)
+                        property Fact battVoltMult:     controller.getParameterFact(-1, "BATT3_VOLT_MULT", false /* reportMissing */)
+                        property Fact battVoltPin:      controller.getParameterFact(-1, "BATT3_VOLT_PIN", false /* reportMissing */)
+                        property FactGroup  _batteryFactGroup:  batt3FullSettings.visible ? controller.vehicle.getFactGroup("battery2") : null
                         property Fact vehicleVoltage:   _batteryFactGroup ? _batteryFactGroup.voltage : null
                         property Fact vehicleCurrent:   _batteryFactGroup ? _batteryFactGroup.current : null
                     }

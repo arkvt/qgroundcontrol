@@ -63,7 +63,7 @@ RowLayout {
                 font.bold:              true
 
                 property string _commLostText:      qsTr("Comms Lost")
-                property string _readyToFlyText:    qsTr("Ready")
+                property string _readyToFlyText:    qsTr("Ready To Fly")
                 property string _notReadyToFlyText: qsTr("Not Ready")
                 property string _disconnectedText:  qsTr("Disconnected")
                 property string _armedText:         qsTr("Armed")
