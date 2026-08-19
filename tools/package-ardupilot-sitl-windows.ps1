@@ -84,26 +84,28 @@ function Resolve-AsciiPathForCygwin {
     }
 
     # Passing a Unicode Windows path as a native Bash argument can be decoded
-    # with the wrong code page by Cygwin. Map the parent to an unused drive so
-    # the argument passed through the process boundary is ASCII-only.
+    # with the wrong code page by Cygwin. Reuse one fixed drive so repeated
+    # packaging runs do not leave a collection of subst drives behind.
     $mappingTarget = Split-Path -Parent $resolved
     $existingMappings = (& subst.exe) -join "`n"
-    foreach ($letter in @('U', 'V', 'W', 'X', 'Y', 'Z')) {
-        $drive = "${letter}:"
-        if ($existingMappings -match "(?im)^$([regex]::Escape($drive))\\") {
-            continue
+    $drive = 'U:'
+    $mappedPath = Join-Path $drive (Split-Path -Leaf $resolved)
+    if ($existingMappings -match '(?im)^U:\\') {
+        if ((Test-Path -LiteralPath (Join-Path $mappedPath 'waf') -PathType Leaf) -and
+            (Test-Path -LiteralPath (Join-Path $mappedPath 'ArduPlane') -PathType Container)) {
+            Write-Host "Reusing Cygwin ASCII source mapping: $drive"
+            return $mappedPath
         }
-
-        & subst.exe $drive $mappingTarget
-        if ($LASTEXITCODE -ne 0) {
-            continue
-        }
-
-        Write-Host "Cygwin ASCII source mapping: $drive => $mappingTarget"
-        return Join-Path $drive (Split-Path -Leaf $resolved)
+        throw "U: is already mapped to another location. Remove it with 'subst U: /d' and retry."
     }
 
-    throw 'The ArduPilot source path contains non-ASCII characters and no unused ASCII drive letter is available (U: through Z:).'
+    & subst.exe $drive $mappingTarget
+    if ($LASTEXITCODE -ne 0) {
+        throw "Failed to map $mappingTarget to U: for Cygwin path compatibility."
+    }
+
+    Write-Host "Cygwin ASCII source mapping: $drive => $mappingTarget"
+    return $mappedPath
 }
 
 function Convert-ToCygwinPath {

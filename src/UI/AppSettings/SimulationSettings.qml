@@ -22,6 +22,8 @@ SettingsPage {
 
     readonly property var _simulator: TrainingSimulator
     readonly property real _labelWidth: ScreenTools.defaultFontPixelWidth * 20
+    readonly property bool _planeConfigurationEnabled: !_simulator.planeRunning
+    readonly property bool _targetConfigurationEnabled: !_simulator.targetRunning
 
     function commitNumber(field, propertyName) {
         const value = Number(field.text)
@@ -109,7 +111,6 @@ SettingsPage {
             columns: 3
             columnSpacing: ScreenTools.defaultFontPixelWidth
             rowSpacing: ScreenTools.defaultFontPixelHeight / 2
-            enabled: !_simulator.running
 
             QGCLabel { text: qsTr("纬度"); Layout.preferredWidth: root._labelWidth }
             QGCTextField {
@@ -117,6 +118,7 @@ SettingsPage {
                 Layout.fillWidth: true
                 text: _simulator.latitude.toFixed(7)
                 numericValuesOnly: true
+                enabled: root._targetConfigurationEnabled
                 onEditingFinished: root.commitNumber(latitudeField, "latitude")
             }
             QGCLabel { text: "°" }
@@ -127,6 +129,7 @@ SettingsPage {
                 Layout.fillWidth: true
                 text: _simulator.longitude.toFixed(7)
                 numericValuesOnly: true
+                enabled: root._targetConfigurationEnabled
                 onEditingFinished: root.commitNumber(longitudeField, "longitude")
             }
             QGCLabel { text: "°" }
@@ -137,6 +140,7 @@ SettingsPage {
                 Layout.fillWidth: true
                 text: _simulator.altitude.toString()
                 numericValuesOnly: true
+                enabled: root._targetConfigurationEnabled
                 onEditingFinished: root.commitNumber(altitudeField, "altitude")
             }
             QGCLabel { text: qsTr("m") }
@@ -147,6 +151,7 @@ SettingsPage {
                 Layout.fillWidth: true
                 text: _simulator.heading.toString()
                 numericValuesOnly: true
+                enabled: root._planeConfigurationEnabled
                 onEditingFinished: root.commitNumber(headingField, "heading")
             }
             QGCLabel { text: qsTr("°（0 为正北）") }
@@ -157,6 +162,7 @@ SettingsPage {
                 Layout.fillWidth: true
                 text: _simulator.targetSpeed.toString()
                 numericValuesOnly: true
+                enabled: root._targetConfigurationEnabled
                 onEditingFinished: root.commitNumber(speedField, "targetSpeed")
             }
             QGCLabel { text: qsTr("m/s") }
@@ -166,6 +172,7 @@ SettingsPage {
                 id: patternCombo
                 Layout.fillWidth: true
                 textRole: "text"
+                enabled: root._targetConfigurationEnabled
                 model: ListModel {
                     ListElement { text: qsTr("绕圈"); value: "circle" }
                     ListElement { text: qsTr("向东直行"); value: "east" }
@@ -190,7 +197,7 @@ SettingsPage {
                 Layout.fillWidth: true
                 text: _simulator.targetRadius.toString()
                 numericValuesOnly: true
-                enabled: patternCombo.currentIndex === 0
+                enabled: root._targetConfigurationEnabled && patternCombo.currentIndex === 0
                 onEditingFinished: root.commitNumber(radiusField, "targetRadius")
             }
             QGCLabel { text: qsTr("m") }
@@ -201,6 +208,7 @@ SettingsPage {
                 Layout.fillWidth: true
                 text: _simulator.targetRate.toString()
                 numericValuesOnly: true
+                enabled: root._targetConfigurationEnabled
                 onEditingFinished: root.commitNumber(rateField, "targetRate")
             }
             QGCLabel { text: qsTr("Hz") }
@@ -211,6 +219,7 @@ SettingsPage {
                 Layout.fillWidth: true
                 text: _simulator.nmeaPort.toString()
                 numericValuesOnly: true
+                enabled: root._targetConfigurationEnabled
                 onEditingFinished: root.commitNumber(portField, "nmeaPort")
             }
             QGCLabel { text: qsTr("默认 10110") }
@@ -219,7 +228,7 @@ SettingsPage {
         QGCCheckBox {
             text: qsTr("启动飞机时擦除 SITL EEPROM（训练环境首次使用建议勾选）")
             checked: _simulator.wipeEeprom
-            enabled: !_simulator.running
+            enabled: root._planeConfigurationEnabled
             onClicked: _simulator.wipeEeprom = checked
         }
     }

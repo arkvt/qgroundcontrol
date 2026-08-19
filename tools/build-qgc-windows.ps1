@@ -10,11 +10,14 @@
 
 .EXAMPLE
     .\tools\build-qgc-windows.ps1 -Action run
+
+.EXAMPLE
+    .\tools\build-qgc-windows.ps1 -Action installer -Config Release -SitlPackage .\artifacts\sitl-windows
 #>
 
 [CmdletBinding()]
 param(
-    [ValidateSet('configure', 'build', 'deploy', 'run', 'clean', 'rebuild', 'all')]
+    [ValidateSet('configure', 'build', 'deploy', 'installer', 'run', 'clean', 'rebuild', 'all')]
     [string]$Action = 'build',
 
     [ValidateSet('Debug', 'Release', 'RelWithDebInfo', 'MinSizeRel')]
@@ -257,7 +260,20 @@ function Invoke-Configure {
     Write-Host "GStreamer: $gstValue"
 
     $sitlPackageResolved = Resolve-SitlPackage
-    $sitlCmakeValue = if ($sitlPackageResolved) { $sitlPackageResolved.Replace('\', '/') } else { '' }
+    if ($sitlPackageResolved) {
+        # CMake/Qt tools can misread non-ASCII Windows paths. When the SITL
+        # package lives below the repository, use the same ASCII drive mapping
+        # as the source tree so the install script can read it reliably.
+        $sitlPathForCmake = $sitlPackageResolved
+        $repoRootFull = Resolve-FullPath $RepoRoot
+        if ($sitlPackageResolved.StartsWith($repoRootFull, [System.StringComparison]::OrdinalIgnoreCase)) {
+            $relativeSitlPath = $sitlPackageResolved.Substring($repoRootFull.Length).TrimStart('\')
+            $sitlPathForCmake = Join-Path $script:SourceRootResolved $relativeSitlPath
+        }
+        $sitlCmakeValue = $sitlPathForCmake.Replace('\', '/')
+    } else {
+        $sitlCmakeValue = ''
+    }
 
     & $script:Cmake -S $script:SourceRootResolved -B $BuildDir -G 'Ninja Multi-Config' `
         "-DCMAKE_TOOLCHAIN_FILE=$toolchain" `
@@ -313,6 +329,25 @@ function Invoke-Run {
     }
 }
 
+function Invoke-Installer {
+    # Build and deploy first so the install tree contains the executable,
+    # Qt runtime files, QML modules, and the bundled SITL runtime.
+    Invoke-Build
+    Invoke-Deploy
+    Initialize-BuildEnvironment
+
+    & $script:Cmake --install $BuildDir --config $Config
+    if ($LASTEXITCODE -ne 0) {
+        throw "Windows installer generation failed with exit code $LASTEXITCODE. Ensure NSIS is installed and makensis.exe is available."
+    }
+
+    $installer = Join-Path $BuildDir "$AppName-installer.exe"
+    if (-not (Test-Path -LiteralPath $installer -PathType Leaf)) {
+        throw "Windows installer was not created at $installer."
+    }
+    Write-Host "Windows installer: $installer"
+}
+
 function Invoke-Clean {
     $buildRoot = Resolve-FullPath (Join-Path $RepoRoot 'build')
     $target = Resolve-FullPath $BuildDir
@@ -333,6 +368,7 @@ switch ($Action) {
     'configure' { Invoke-Configure }
     'build'     { Invoke-Build }
     'deploy'    { Invoke-Deploy }
+    'installer' { Invoke-Installer }
     'run'       { Invoke-Run }
     'clean'     { Invoke-Clean }
     'rebuild'   { Invoke-Clean; Invoke-Build; Invoke-Deploy }

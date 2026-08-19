@@ -657,7 +657,7 @@ Item {
 
             sourceItem: MissionItemIndexLabel {
                 id: loiterMarkerSource
-                index: _root.missionPointBaseIndex + 1
+                index: _root.missionPointBaseIndex
                 label: qsTr("Loiter descent") + "  +"
                        + Number(_root.controller.loiterHeightAboveLanding).toFixed(1) + " " + qsTr("m")
                 checked: _root._selectedMarker === 2
@@ -684,7 +684,7 @@ Item {
 
             sourceItem: MissionItemIndexLabel {
                 id: landingMarkerSource
-                index: _root.missionPointBaseIndex
+                index: _root.missionPointBaseIndex + 1
                 label: qsTr("Vertical land") + "  "
                        + (isFinite(Number(_root.controller.landingElevation))
                               ? Number(_root.controller.landingElevation).toFixed(1) + " " + qsTr("m AMSL")
