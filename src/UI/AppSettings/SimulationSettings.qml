@@ -36,13 +36,13 @@ SettingsPage {
 
     SettingsGroupLayout {
         heading: qsTr("仿真训练")
-        headingDescription: qsTr("飞机使用 WSL 中的 ArduPlane SITL；小车由内置脚本生成 RTK NMEA 数据，QGC 再将其转换为飞机所需的 FOLLOW_TARGET 消息。需要可正常运行的 WSL、ArduPilot SITL 环境和 Windows Python 3.9 或更高版本。")
+        headingDescription: qsTr("飞机使用安装包内的预编译 ArduPlane SITL；小车位置由 QGC 内置模拟器生成，随后转换为飞机所需的 FOLLOW_TARGET 消息。飞机和小车仿真可以分别启动与停止。")
 
         QGCLabel {
             Layout.fillWidth: true
             text: _simulator.supported
-                  ? qsTr("点击一次即可同时启动飞机和小车。首次启动或擦除 EEPROM 后，飞机连接通常需要数十秒。")
-                  : qsTr("当前平台不支持此功能；请在 Windows + WSL 环境中使用。")
+                  ? qsTr("按需分别启动飞机和小车仿真。首次启动或擦除 EEPROM 后，飞机连接通常需要数十秒。")
+                  : qsTr("当前平台不支持此功能；请在 Windows 环境中使用。")
             wrapMode: Text.WordWrap
             color: _simulator.supported ? qgcPal.text : qgcPal.warningText
         }
@@ -52,21 +52,27 @@ SettingsPage {
             spacing: ScreenTools.defaultFontPixelWidth
 
             QGCButton {
-                text: qsTr("检查运行环境")
-                enabled: _simulator.supported && !_simulator.running
-                onClicked: _simulator.checkEnvironment()
+                text: qsTr("启动小车仿真")
+                enabled: _simulator.supported && !_simulator.targetRunning
+                onClicked: _simulator.startTargetSimulation()
             }
 
             QGCButton {
-                text: qsTr("启动飞机与小车仿真")
-                enabled: _simulator.supported && !_simulator.running
-                onClicked: _simulator.startTraining()
+                text: qsTr("启动飞机仿真")
+                enabled: _simulator.supported && !_simulator.planeRunning
+                onClicked: _simulator.startPlaneSimulation()
             }
 
             QGCButton {
                 text: qsTr("停止小车仿真")
                 enabled: _simulator.targetRunning
                 onClicked: _simulator.stopTargetSimulation()
+            }
+
+            QGCButton {
+                text: qsTr("停止飞机仿真")
+                enabled: _simulator.planeRunning
+                onClicked: _simulator.stopPlaneSimulation()
             }
 
             QGCButton {
@@ -91,43 +97,6 @@ SettingsPage {
             text: _simulator.errorText
             color: qgcPal.warningText
             wrapMode: Text.WordWrap
-        }
-    }
-
-    SettingsGroupLayout {
-        heading: qsTr("运行环境")
-        headingDescription: qsTr("默认值对应当前交付环境。若源码或 Python 安装位置不同，可在这里修改；设置会自动保存。")
-
-        GridLayout {
-            Layout.fillWidth: true
-            columns: 2
-            columnSpacing: ScreenTools.defaultFontPixelWidth
-            rowSpacing: ScreenTools.defaultFontPixelHeight / 2
-            enabled: !_simulator.running
-
-            QGCLabel { text: qsTr("WSL 发行版"); Layout.preferredWidth: root._labelWidth }
-            QGCTextField {
-                Layout.fillWidth: true
-                text: _simulator.wslDistribution
-                placeholderText: "ubuntu_22.04"
-                onEditingFinished: _simulator.wslDistribution = text
-            }
-
-            QGCLabel { text: qsTr("ArduPilot 源码路径") }
-            QGCTextField {
-                Layout.fillWidth: true
-                text: _simulator.ardupilotPath
-                placeholderText: "/home/ubuntu/ardupilot"
-                onEditingFinished: _simulator.ardupilotPath = text
-            }
-
-            QGCLabel { text: qsTr("Python 命令") }
-            QGCTextField {
-                Layout.fillWidth: true
-                text: _simulator.pythonExecutable
-                placeholderText: qsTr("python 或 python.exe 的完整路径")
-                onEditingFinished: _simulator.pythonExecutable = text
-            }
         }
     }
 
@@ -257,7 +226,7 @@ SettingsPage {
 
     SettingsGroupLayout {
         heading: qsTr("运行日志")
-        headingDescription: qsTr("日志同时包含 ArduPlane SITL 和小车 NMEA 脚本输出，可用于判断启动失败原因。")
+        headingDescription: qsTr("日志同时包含 ArduPlane SITL 和 QGC 内置目标模拟器输出，可用于判断启动失败原因。")
 
         ScrollView {
             Layout.fillWidth: true

@@ -145,6 +145,7 @@ Item {
             z:                  _fullItemZorder + 2
             parentToolInsets:   widgetLayer.totalToolInsets
             mapControl:         _mapControl
+            missionController:  _missionController
             visible:            !QGroundControl.videoManager.fullScreen
         }
 

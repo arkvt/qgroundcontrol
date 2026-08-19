@@ -15,49 +15,60 @@
 #include "SettingsManager.h"
 
 #include <QtCore/QCoreApplication>
+#include <QtCore/QDateTime>
 #include <QtCore/QDir>
-#include <QtCore/QFile>
 #include <QtCore/QFileInfo>
-#include <QtCore/QSaveFile>
+#include <QtCore/QProcessEnvironment>
 #include <QtCore/QSettings>
 #include <QtCore/QStandardPaths>
-#include <QtCore/QStringDecoder>
-#include <QtCore/QTimer>
-#include <QtNetwork/QUdpSocket>
+#include <QtMath>
+
+#include <cmath>
+
+#ifdef Q_OS_WIN
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+#endif
+
+namespace {
+constexpr double kEarthRadiusMeters = 6378137.0;
+constexpr double kKnotsPerMeterPerSecond = 1.9438444924406048;
+
+double courseFromVelocity(double northVelocity, double eastVelocity)
+{
+    if (std::hypot(northVelocity, eastVelocity) < 0.01) {
+        return 0.0;
+    }
+    double course = qRadiansToDegrees(std::atan2(eastVelocity, northVelocity));
+    if (course < 0.0) {
+        course += 360.0;
+    }
+    return course;
+}
+}
 
 TrainingSimulatorController::TrainingSimulatorController(QObject *parent)
     : QObject(parent)
 {
     _loadConfiguration();
-
     _planeProcess.setProcessChannelMode(QProcess::MergedChannels);
-    _targetProcess.setProcessChannelMode(QProcess::MergedChannels);
+    _targetTimer.setTimerType(Qt::PreciseTimer);
 
     connect(&_planeProcess, &QProcess::readyRead, this, [this]() {
         _appendLog(tr("飞机"), _planeProcess.readAll());
     });
-    connect(&_targetProcess, &QProcess::readyRead, this, [this]() {
-        _appendLog(tr("小车"), _targetProcess.readAll());
-    });
     connect(&_planeProcess, &QProcess::stateChanged, this, &TrainingSimulatorController::runningChanged);
-    connect(&_targetProcess, &QProcess::stateChanged, this, &TrainingSimulatorController::runningChanged);
+    connect(&_targetTimer, &QTimer::timeout, this, &TrainingSimulatorController::_sendTargetPosition);
 
     connect(&_planeProcess, &QProcess::errorOccurred, this, [this](QProcess::ProcessError error) {
         if (!_stopping && (error == QProcess::FailedToStart || error == QProcess::Crashed)) {
             _setError(tr("飞机仿真进程错误：%1").arg(_planeProcess.errorString()));
         }
     });
-    connect(&_targetProcess, &QProcess::errorOccurred, this, [this](QProcess::ProcessError error) {
-        if (!_stopping && (error == QProcess::FailedToStart || error == QProcess::Crashed)) {
-            _setError(tr("小车仿真进程错误：%1").arg(_targetProcess.errorString()));
-        }
-    });
-
     connect(&_planeProcess, &QProcess::finished, this, [this](int exitCode, QProcess::ExitStatus) {
-        _handleUnexpectedExit(tr("飞机"), exitCode);
-    });
-    connect(&_targetProcess, &QProcess::finished, this, [this](int exitCode, QProcess::ExitStatus) {
-        _handleUnexpectedExit(tr("小车"), exitCode);
+        _handleUnexpectedExit(exitCode);
     });
 
     if (QCoreApplication::instance()) {
@@ -65,17 +76,13 @@ TrainingSimulatorController::TrainingSimulatorController(QObject *parent)
                 this, &TrainingSimulatorController::stopTraining, Qt::DirectConnection);
     }
 
-    // A forced termination cannot emit aboutToQuit. On the next launch, use the
-    // persisted marker to remove any SITL process left by the previous session.
-    if (_cleanupRequired) {
+    // A Windows Job Object terminates SITL if QGC is killed. The marker is
+    // retained only so QGC settings can be restored after an abnormal exit.
+    if (_cleanupRequired || _qgcConfigurationOverridden) {
         QTimer::singleShot(0, this, [this]() {
-            _stopping = true;
-            _stopTargetProcess();
-            _stopPlaneProcess();
             _restoreQgcConfiguration();
             _setCleanupRequired(false);
-            _stopping = false;
-            _appendLog(tr("系统"), tr("已清理上次异常退出遗留的仿真进程。\n").toUtf8());
+            _appendLog(tr("系统"), tr("已恢复上次异常退出前的 QGC 仿真设置。\n").toUtf8());
             emit runningChanged();
         });
     }
@@ -102,7 +109,7 @@ bool TrainingSimulatorController::planeRunning() const
 
 bool TrainingSimulatorController::targetRunning() const
 {
-    return _targetProcess.state() != QProcess::NotRunning;
+    return _targetTimer.isActive();
 }
 
 bool TrainingSimulatorController::running() const
@@ -119,7 +126,7 @@ QString TrainingSimulatorController::statusText() const
         return tr("飞机仿真正在运行，小车仿真已停止");
     }
     if (targetRunning()) {
-        return tr("小车脚本正在运行，等待飞机 SITL");
+        return tr("小车仿真正在运行，飞机 SITL 已停止");
     }
     return tr("仿真未启动");
 }
@@ -128,9 +135,7 @@ void TrainingSimulatorController::_loadConfiguration()
 {
     QSettings settings;
     settings.beginGroup(kSettingsGroup);
-    _wslDistribution = settings.value(QStringLiteral("wslDistribution"), _wslDistribution).toString();
-    _ardupilotPath = settings.value(QStringLiteral("ardupilotPath"), _ardupilotPath).toString();
-    _pythonExecutable = settings.value(QStringLiteral("pythonExecutable"), _pythonExecutable).toString();
+    _sitlExecutable = settings.value(QStringLiteral("sitlExecutable"), _sitlExecutable).toString();
     _latitude = settings.value(QStringLiteral("latitude"), _latitude).toDouble();
     _longitude = settings.value(QStringLiteral("longitude"), _longitude).toDouble();
     _altitude = settings.value(QStringLiteral("altitude"), _altitude).toDouble();
@@ -142,7 +147,6 @@ void TrainingSimulatorController::_loadConfiguration()
     _nmeaPort = settings.value(QStringLiteral("nmeaPort"), _nmeaPort).toInt();
     _wipeEeprom = settings.value(QStringLiteral("wipeEeprom"), _wipeEeprom).toBool();
     _cleanupRequired = settings.value(QStringLiteral("cleanupRequired"), false).toBool();
-    _targetProcessId = settings.value(QStringLiteral("targetProcessId"), 0).toLongLong();
     _qgcConfigurationOverridden = settings.value(QStringLiteral("qgcConfigurationOverridden"), false).toBool();
     _previousNmeaDevice = settings.value(QStringLiteral("previousNmeaDevice"));
     _previousNmeaPort = settings.value(QStringLiteral("previousNmeaPort"));
@@ -167,12 +171,6 @@ void TrainingSimulatorController::_setCleanupRequired(bool required)
     _saveConfigurationValue(QStringLiteral("cleanupRequired"), required);
 }
 
-void TrainingSimulatorController::_setTargetProcessId(qint64 processId)
-{
-    _targetProcessId = processId;
-    _saveConfigurationValue(QStringLiteral("targetProcessId"), processId);
-}
-
 #define DEFINE_STRING_SETTER(Name, Member, Key) \
     void TrainingSimulatorController::set##Name(const QString &value) \
     { \
@@ -192,9 +190,7 @@ void TrainingSimulatorController::_setTargetProcessId(qint64 processId)
         emit configurationChanged(); \
     }
 
-DEFINE_STRING_SETTER(WslDistribution, _wslDistribution, "wslDistribution")
-DEFINE_STRING_SETTER(ArdupilotPath, _ardupilotPath, "ardupilotPath")
-DEFINE_STRING_SETTER(PythonExecutable, _pythonExecutable, "pythonExecutable")
+DEFINE_STRING_SETTER(SitlExecutable, _sitlExecutable, "sitlExecutable")
 DEFINE_DOUBLE_SETTER(Latitude, _latitude, "latitude")
 DEFINE_DOUBLE_SETTER(Longitude, _longitude, "longitude")
 DEFINE_DOUBLE_SETTER(Altitude, _altitude, "altitude")
@@ -227,117 +223,185 @@ void TrainingSimulatorController::setWipeEeprom(bool value)
     emit configurationChanged();
 }
 
-bool TrainingSimulatorController::startTraining()
+bool TrainingSimulatorController::_validateLocation()
 {
-#ifndef Q_OS_WIN
-    _setError(tr("该训练功能当前仅支持 Windows + WSL 环境。"));
-    return false;
-#else
-    if (running()) {
-        _setError(tr("仿真已经启动，请先停止后再重新启动。"));
-        return false;
-    }
-    if (_wslDistribution.isEmpty() || _ardupilotPath.isEmpty()) {
-        _setError(tr("请填写 WSL 发行版名称和 ArduPilot 源码路径。"));
-        return false;
-    }
-    if (_latitude < -90.0 || _latitude > 90.0 || _longitude < -180.0 || _longitude > 180.0) {
+    if (_latitude <= -89.999 || _latitude >= 89.999 || _longitude < -180.0 || _longitude > 180.0) {
         _setError(tr("起始点经纬度超出有效范围。"));
         return false;
     }
-    if (_altitude < -1000.0 || _altitude > 100000.0 || _heading < 0.0 || _heading >= 360.0) {
-        _setError(tr("高度或航向超出有效范围；航向应为 0（含）到 360（不含）度。"));
+    if (_altitude < -1000.0 || _altitude > 100000.0) {
+        _setError(tr("海拔高度超出有效范围。"));
         return false;
     }
-    if (_targetSpeed < 0.0 || _targetRate <= 0.0 || _targetRadius < 1.0) {
-        _setError(tr("小车速度、输出频率或转弯半径设置无效。"));
+    return true;
+}
+
+bool TrainingSimulatorController::_validateTargetConfiguration()
+{
+    if (!_validateLocation()) {
+        return false;
+    }
+    if (_targetSpeed < 0.0 || _targetRate <= 0.0 || _targetRate > 100.0 || _targetRadius < 1.0) {
+        _setError(tr("小车速度、输出频率或转弯半径设置无效；输出频率上限为 100 Hz。"));
         return false;
     }
     if (_nmeaPort < 1 || _nmeaPort > 65535) {
         _setError(tr("NMEA UDP 端口必须在 1 到 65535 之间。"));
         return false;
     }
-    const QStringList patterns{QStringLiteral("circle"), QStringLiteral("east"), QStringLiteral("north"), QStringLiteral("line")};
+    const QStringList patterns{QStringLiteral("circle"), QStringLiteral("east"),
+                               QStringLiteral("north"), QStringLiteral("line")};
     if (!patterns.contains(_targetPattern)) {
         _setError(tr("小车运动轨迹设置无效。"));
         return false;
     }
+    return true;
+}
+
+bool TrainingSimulatorController::startPlaneSimulation()
+{
+#ifndef Q_OS_WIN
+    _setError(tr("该仿真运行包当前仅支持 Windows。"));
+    return false;
+#else
+    if (planeRunning()) {
+        _setError(tr("飞机仿真已经启动。"));
+        return false;
+    }
+    if (!_validateLocation()) {
+        return false;
+    }
+    if (_heading < 0.0 || _heading >= 360.0) {
+        _setError(tr("飞机初始航向应为 0（含）到 360（不含）度。"));
+        return false;
+    }
 
     _setError(QString());
-    clearLog();
-    QString wsl;
-    QString python;
-    QString scriptPath;
-    if (!_prepareEnvironment(wsl, python, scriptPath)) {
+    if (!running()) {
+        clearLog();
+    }
+    QString executable;
+    QString quadplaneDefaults;
+    QString followDefaults;
+    QString runtimeDirectory;
+    if (!_prepareEnvironment(executable, quadplaneDefaults, followDefaults, runtimeDirectory)) {
         return false;
     }
 
     _configureQgcForTraining();
-    _appendLog(tr("系统"), tr("已启用 NMEA UDP %1、MAVLink UDP 14550，并将跟随目标发送策略临时设为“始终”。\n")
-                                  .arg(_nmeaPort).toUtf8());
+    _appendLog(tr("系统"), tr("已启用飞机所需的 MAVLink UDP 14550 和 FOLLOW_TARGET。\n").toUtf8());
 
-    QStringList targetArguments;
-    if (QFileInfo(python).completeBaseName().compare(QStringLiteral("py"), Qt::CaseInsensitive) == 0) {
-        targetArguments << QStringLiteral("-3");
+    QStringList arguments{QStringLiteral("-S")};
+    if (_wipeEeprom) {
+        arguments << QStringLiteral("-w");
     }
-    targetArguments << QStringLiteral("-u") << QDir::toNativeSeparators(scriptPath)
-                    << QStringLiteral("--host") << QStringLiteral("127.0.0.1")
-                    << QStringLiteral("--port") << QString::number(_nmeaPort)
-                    << QStringLiteral("--lat") << QString::number(_latitude, 'f', 8)
-                    << QStringLiteral("--lon") << QString::number(_longitude, 'f', 8)
-                    << QStringLiteral("--alt") << QString::number(_altitude, 'f', 2)
-                    << QStringLiteral("--speed") << QString::number(_targetSpeed, 'f', 2)
-                    << QStringLiteral("--rate") << QString::number(_targetRate, 'f', 2)
-                    << QStringLiteral("--pattern") << _targetPattern
-                    << QStringLiteral("--radius") << QString::number(_targetRadius, 'f', 2);
-    _targetProcess.setProgram(python);
-    _targetProcess.setArguments(targetArguments);
-    _targetProcess.setWorkingDirectory(QFileInfo(scriptPath).absolutePath());
-    _targetProcess.start();
-    if (!_targetProcess.waitForStarted(3000)) {
-        _setError(tr("小车脚本启动失败：%1").arg(_targetProcess.errorString()));
-        _restoreQgcConfiguration();
-        return false;
-    }
-    _setTargetProcessId(_targetProcess.processId());
-    _setCleanupRequired(true);
+    const QString location = QStringLiteral("%1,%2,%3,%4")
+                                 .arg(QString::number(_latitude, 'f', 8),
+                                      QString::number(_longitude, 'f', 8),
+                                      QString::number(_altitude, 'f', 2),
+                                      QString::number(_heading, 'f', 1));
+    arguments << QStringLiteral("--model") << QStringLiteral("quadplane")
+              << QStringLiteral("--speedup") << QStringLiteral("1")
+              << QStringLiteral("--sysid") << QStringLiteral("1")
+              << QStringLiteral("--slave") << QStringLiteral("0")
+              << QStringLiteral("--defaults") << (quadplaneDefaults + QLatin1Char(',') + followDefaults)
+              << QStringLiteral("--sim-address") << QStringLiteral("127.0.0.1")
+              << QStringLiteral("-I0")
+              << QStringLiteral("--home") << location
+              << QStringLiteral("--serial0") << QStringLiteral("udpclient:127.0.0.1:14550");
 
-    _planeProcess.setProgram(wsl);
-    _planeProcess.setArguments({QStringLiteral("-d"), _wslDistribution, QStringLiteral("--exec"),
-                                QStringLiteral("setsid"), QStringLiteral("--wait"), QStringLiteral("bash"), QStringLiteral("-lc"),
-                                _buildPlaneCommand()});
-    // QGC is often run from a substituted deployment drive (for example Q:). WSL cannot
-    // translate such a working directory, so always launch it from a real local directory.
-    _planeProcess.setWorkingDirectory(QDir::tempPath());
+    QProcessEnvironment environment = QProcessEnvironment::systemEnvironment();
+    const QString binaryDirectory = QFileInfo(executable).absolutePath();
+    environment.insert(QStringLiteral("PATH"), binaryDirectory + QDir::listSeparator()
+                                                + environment.value(QStringLiteral("PATH")));
+    environment.insert(QStringLiteral("CYGWIN"), QStringLiteral("nodosfilewarning"));
+    _planeProcess.setProcessEnvironment(environment);
+    _planeProcess.setProgram(executable);
+    _planeProcess.setArguments(arguments);
+    _planeProcess.setWorkingDirectory(runtimeDirectory);
+
+    _stopping = true; // Suppress the generic exit handler during startup validation.
     _planeProcess.start();
     if (!_planeProcess.waitForStarted(5000)) {
+        _stopping = false;
         _setError(tr("飞机 SITL 启动失败：%1").arg(_planeProcess.errorString()));
-        stopTraining();
+        if (!targetRunning()) {
+            _restoreQgcConfiguration();
+        }
+        return false;
+    }
+    if (_planeProcess.waitForFinished(750)) {
+        const QString output = QString::fromUtf8(_planeProcess.readAll()).trimmed();
+        _stopping = false;
+        _setError(tr("飞机 SITL 启动后立即退出（退出码 %1）：%2")
+                      .arg(_planeProcess.exitCode()).arg(output));
+        if (!targetRunning()) {
+            _restoreQgcConfiguration();
+        }
         return false;
     }
 
-    _appendLog(tr("系统"), tr("启动命令已发出。飞机连接通常需要数十秒，请观察状态栏中的载具连接。\n").toUtf8());
+    HANDLE job = CreateJobObjectW(nullptr, nullptr);
+    if (job) {
+        JOBOBJECT_EXTENDED_LIMIT_INFORMATION limits{};
+        limits.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
+        const bool configured = SetInformationJobObject(job, JobObjectExtendedLimitInformation,
+                                                        &limits, sizeof(limits));
+        HANDLE process = OpenProcess(PROCESS_SET_QUOTA | PROCESS_TERMINATE, FALSE,
+                                     static_cast<DWORD>(_planeProcess.processId()));
+        const bool assigned = process && AssignProcessToJobObject(job, process);
+        if (process) {
+            CloseHandle(process);
+        }
+        if (configured && assigned) {
+            _planeJobHandle = reinterpret_cast<quintptr>(job);
+        } else {
+            CloseHandle(job);
+            _appendLog(tr("系统"), tr("警告：无法把 SITL 加入 Windows 作业对象；正常退出时仍会清理进程。\n").toUtf8());
+        }
+    }
+    _stopping = false;
+
+    _setCleanupRequired(true);
+    _appendLog(tr("系统"), tr("飞机仿真已启动：直接运行预编译 ArduPlane SITL，未使用 WSL、Python 或源码编译。\n").toUtf8());
     emit runningChanged();
     return true;
 #endif
 }
 
-bool TrainingSimulatorController::checkEnvironment()
+bool TrainingSimulatorController::startTargetSimulation()
 {
 #ifndef Q_OS_WIN
-    _setError(tr("该训练功能当前仅支持 Windows + WSL 环境。"));
+    _setError(tr("该仿真运行包当前仅支持 Windows。"));
     return false;
 #else
-    if (running()) {
-        _setError(tr("请先停止仿真，再检查运行环境。"));
+    if (targetRunning()) {
+        _setError(tr("小车仿真已经启动。"));
+        return false;
+    }
+    if (!_validateTargetConfiguration()) {
         return false;
     }
     _setError(QString());
-    clearLog();
-    QString wsl;
-    QString python;
-    QString scriptPath;
-    return _prepareEnvironment(wsl, python, scriptPath);
+    if (!running()) {
+        clearLog();
+    }
+    _configureQgcForTraining();
+    _targetElapsed.start();
+    _lastTargetLogSecond = -1;
+    _targetTimer.start(qMax(1, qRound(1000.0 / _targetRate)));
+    _sendTargetPosition();
+    if (!targetRunning()) {
+        if (!planeRunning()) {
+            _restoreQgcConfiguration();
+        }
+        return false;
+    }
+    _setCleanupRequired(true);
+    _appendLog(tr("系统"), tr("小车仿真已启动：通过 NMEA UDP %1 输出目标位置。\n")
+                                  .arg(_nmeaPort).toUtf8());
+    emit runningChanged();
+    return true;
 #endif
 }
 
@@ -347,11 +411,29 @@ void TrainingSimulatorController::stopTraining()
         return;
     }
     _stopping = true;
-    _stopTargetProcess();
+    _stopTargetSimulation();
     _stopPlaneProcess();
     _restoreQgcConfiguration();
     _setCleanupRequired(false);
     _stopping = false;
+    emit runningChanged();
+}
+
+void TrainingSimulatorController::stopPlaneSimulation()
+{
+    if (_stopping || !planeRunning()) {
+        return;
+    }
+    _stopping = true;
+    _stopPlaneProcess();
+    _stopping = false;
+    _appendLog(tr("系统"), targetRunning()
+        ? tr("飞机仿真已停止，小车仿真继续运行。\n").toUtf8()
+        : tr("飞机仿真已停止。\n").toUtf8());
+    if (!targetRunning()) {
+        _restoreQgcConfiguration();
+        _setCleanupRequired(false);
+    }
     emit runningChanged();
 }
 
@@ -360,16 +442,21 @@ void TrainingSimulatorController::stopTargetSimulation()
     if (_stopping || !targetRunning()) {
         return;
     }
-
-    _stopping = true;
-    _stopTargetProcess();
-    _appendLog(tr("系统"), tr("小车仿真已停止，飞机仿真继续运行。\n").toUtf8());
+    _stopTargetSimulation();
+    _appendLog(tr("系统"), planeRunning()
+        ? tr("小车仿真已停止，飞机仿真继续运行。\n").toUtf8()
+        : tr("小车仿真已停止。\n").toUtf8());
     if (!planeRunning()) {
         _restoreQgcConfiguration();
         _setCleanupRequired(false);
     }
-    _stopping = false;
     emit runningChanged();
+}
+
+void TrainingSimulatorController::_stopTargetSimulation()
+{
+    _targetTimer.stop();
+    _targetSocket.close();
 }
 
 void TrainingSimulatorController::clearLog()
@@ -437,7 +524,7 @@ void TrainingSimulatorController::_configureQgcForTraining()
     autoConnect->autoConnectNmeaPort()->setRawValue(QStringLiteral("UDP Port"));
     autoConnect->udpListenPort()->setRawValue(14550);
     autoConnect->autoConnectUDP()->setRawValue(true);
-    app->followTarget()->setRawValue(1); // Always send converted NMEA position as FOLLOW_TARGET.
+    app->followTarget()->setRawValue(1);
 }
 
 void TrainingSimulatorController::_restoreQgcConfiguration()
@@ -474,466 +561,211 @@ void TrainingSimulatorController::_restoreQgcConfiguration()
     _appendLog(tr("系统"), tr("已恢复启动仿真前的 QGC NMEA 与跟随目标设置。\n").toUtf8());
 }
 
-void TrainingSimulatorController::_stopTargetProcess()
-{
-    if (_targetProcess.state() != QProcess::NotRunning) {
-        _targetProcess.terminate();
-        if (!_targetProcess.waitForFinished(1500)) {
-            _targetProcess.kill();
-            _targetProcess.waitForFinished(1000);
-        }
-    }
-
-#ifdef Q_OS_WIN
-    if (_targetProcessId > 0) {
-        const QString powershell = _resolveExecutable(QStringLiteral("powershell.exe"),
-                                                       {QStringLiteral("powershell.exe"), QStringLiteral("powershell")});
-        if (!powershell.isEmpty()) {
-            const QString command = QStringLiteral(
-                "$p = Get-CimInstance Win32_Process -Filter 'ProcessId = %1' -ErrorAction SilentlyContinue; "
-                "if ($p -and $p.CommandLine -like '*simulate_rtk_nmea_udp.py*') { "
-                "Stop-Process -Id %1 -Force -ErrorAction SilentlyContinue }")
-                                        .arg(_targetProcessId);
-            QProcess cleanup;
-            cleanup.setWorkingDirectory(QDir::tempPath());
-            cleanup.start(powershell, {QStringLiteral("-NoProfile"), QStringLiteral("-NonInteractive"),
-                                       QStringLiteral("-Command"), command});
-            cleanup.waitForFinished(3000);
-        }
-    }
-#endif
-    _setTargetProcessId(0);
-}
-
 void TrainingSimulatorController::_stopPlaneProcess()
 {
-#ifdef Q_OS_WIN
-    if (_planeProcess.state() != QProcess::NotRunning || _cleanupRequired) {
-        const QString wsl = _resolveExecutable(QStringLiteral("wsl.exe"), {QStringLiteral("wsl.exe"), QStringLiteral("wsl")});
-        if (!wsl.isEmpty()) {
-            const QString cleanupCommand = QStringLiteral(
-                "if read -r sim_pid < %1 2>/dev/null; then "
-                "kill -TERM -- -\"$sim_pid\" 2>/dev/null || true; "
-                "for i in 1 2 3 4 5; do kill -0 -- -\"$sim_pid\" 2>/dev/null || break; sleep 0.2; done; "
-                "kill -KILL -- -\"$sim_pid\" 2>/dev/null || true; fi; "
-                "if command -v pgrep >/dev/null 2>&1; then "
-                "for stale_pid in $(pgrep -f '^build/sitl/bin/arduplane .*qgc_training_follow.params' || true); do "
-                "kill -TERM \"$stale_pid\" 2>/dev/null || true; done; sleep 0.2; "
-                "for stale_pid in $(pgrep -f '^build/sitl/bin/arduplane .*qgc_training_follow.params' || true); do "
-                "kill -KILL \"$stale_pid\" 2>/dev/null || true; done; "
-                "for stale_pid in $(pgrep -f '^setsid --wait bash -lc .*qgc_training_follow.params' || true); do "
-                "kill -TERM \"$stale_pid\" 2>/dev/null || true; done; fi; "
-                "rm -f %1 /tmp/qgc_training_follow.params")
-                                               .arg(_shellQuote(QString::fromLatin1(kPidFile)));
-            QProcess cleanup;
-            cleanup.setWorkingDirectory(QDir::tempPath());
-            cleanup.start(wsl, {QStringLiteral("-d"), _wslDistribution, QStringLiteral("--exec"),
-                                QStringLiteral("bash"), QStringLiteral("-lc"), cleanupCommand});
-            cleanup.waitForFinished(3000);
+    if (_planeProcess.state() != QProcess::NotRunning) {
+        _planeProcess.terminate();
+        if (!_planeProcess.waitForFinished(2000)) {
+            _planeProcess.kill();
+            _planeProcess.waitForFinished(1500);
         }
+    }
+#ifdef Q_OS_WIN
+    if (_planeJobHandle != 0) {
+        CloseHandle(reinterpret_cast<HANDLE>(_planeJobHandle));
+        _planeJobHandle = 0;
     }
 #endif
-    if (_planeProcess.state() == QProcess::NotRunning) {
-        return;
-    }
-    _planeProcess.terminate();
-    if (!_planeProcess.waitForFinished(1500)) {
-        _planeProcess.kill();
-        _planeProcess.waitForFinished(1000);
-    }
 }
 
-void TrainingSimulatorController::_handleUnexpectedExit(const QString &processName, int exitCode)
+void TrainingSimulatorController::_handleUnexpectedExit(int exitCode)
 {
-    emit runningChanged();
     if (_stopping) {
+        emit runningChanged();
         return;
     }
-    _setError(tr("%1仿真意外退出（退出码 %2），已停止本次训练。请查看运行日志。")
-                  .arg(processName).arg(exitCode));
-    QTimer::singleShot(0, this, &TrainingSimulatorController::stopTraining);
+    _stopping = true;
+    _stopPlaneProcess();
+    _stopping = false;
+    _setError(tr("飞机仿真意外退出（退出码 %1）。小车仿真状态不受影响，请查看运行日志。")
+                  .arg(exitCode));
+    if (!targetRunning()) {
+        _restoreQgcConfiguration();
+        _setCleanupRequired(false);
+    }
+    emit runningChanged();
 }
 
-bool TrainingSimulatorController::_prepareEnvironment(QString &wsl, QString &python, QString &scriptPath)
-{
-    if (_wslDistribution.isEmpty() || _ardupilotPath.isEmpty()) {
-        _setError(tr("请填写 WSL 发行版名称和 ArduPilot 源码路径。"));
-        return false;
-    }
-
-    wsl = _resolveExecutable(QStringLiteral("wsl.exe"), {QStringLiteral("wsl.exe"), QStringLiteral("wsl")});
-    if (wsl.isEmpty()) {
-        _setError(tr("未找到 wsl.exe，请先安装或更新 WSL。"));
-        return false;
-    }
-    if (!_selectAvailableWslDistribution(wsl)) {
-        return false;
-    }
-
-    QString pythonVersion;
-    python = _resolvePythonExecutable(&pythonVersion);
-    if (python.isEmpty()) {
-        _setError(tr("未找到可用的 Python 3.9 或更高版本。请安装 Python，或填写 python.exe/py.exe 的完整路径。"));
-        return false;
-    }
-    _appendLog(tr("环境"), tr("Windows Python %1：%2\n").arg(pythonVersion, python).toUtf8());
-
-    scriptPath = _extractTargetScript();
-    QString windowsHostAddress;
-    if (scriptPath.isEmpty() || !_checkWslEnvironment(wsl, &windowsHostAddress)
-        || !_checkWslUdpReachability(wsl, windowsHostAddress)) {
-        return false;
-    }
-
-    _appendLog(tr("环境"), tr("检查通过，可以启动飞机与小车仿真。\n").toUtf8());
-    return true;
-}
-
-bool TrainingSimulatorController::_selectAvailableWslDistribution(const QString &wsl)
-{
-    const QStringList installed = _installedWslDistributions(wsl);
-    if (installed.isEmpty()) {
-        _setError(tr("没有检测到已安装的 WSL 发行版。请先安装 Ubuntu/WSL2。"));
-        return false;
-    }
-
-    QString configuredMatch;
-    for (const QString &distribution : installed) {
-        if (distribution.compare(_wslDistribution, Qt::CaseInsensitive) == 0) {
-            configuredMatch = distribution;
-            break;
-        }
-    }
-
-    QStringList candidates;
-    if (!configuredMatch.isEmpty()) {
-        candidates.append(configuredMatch);
-    }
-    QStringList otherCandidates;
-    for (const QString &distribution : installed) {
-        if (distribution == configuredMatch) {
-            continue;
-        }
-        if (distribution.contains(QStringLiteral("ubuntu"), Qt::CaseInsensitive)) {
-            candidates.append(distribution);
-        } else if (!distribution.contains(QStringLiteral("docker"), Qt::CaseInsensitive)
-                   && !distribution.contains(QStringLiteral("window-agent"), Qt::CaseInsensitive)) {
-            otherCandidates.append(distribution);
-        }
-    }
-    candidates.append(otherCandidates);
-
-    const QString simVehiclePath = QDir::cleanPath(_ardupilotPath + QStringLiteral("/Tools/autotest/sim_vehicle.py"));
-    for (const QString &distribution : candidates) {
-        QProcess probe;
-        probe.setWorkingDirectory(QDir::tempPath());
-        probe.start(wsl, {QStringLiteral("-d"), distribution, QStringLiteral("--exec"),
-                          QStringLiteral("test"), QStringLiteral("-x"), simVehiclePath});
-        if (probe.waitForStarted(3000) && probe.waitForFinished(7000)
-            && probe.exitStatus() == QProcess::NormalExit && probe.exitCode() == 0) {
-            if (distribution == _wslDistribution) {
-                return true;
-            }
-            const QString previous = _wslDistribution;
-            setWslDistribution(distribution);
-            _appendLog(tr("环境"), tr("配置的 WSL 发行版“%1”不可用，已自动选择“%2”。\n")
-                                      .arg(previous, distribution).toUtf8());
-            return true;
-        }
-        if (probe.state() != QProcess::NotRunning) {
-            probe.kill();
-            probe.waitForFinished(500);
-        }
-    }
-
-    _setError(tr("找不到同时包含 %1 的可用 WSL 发行版。已安装：%2")
-                  .arg(simVehiclePath, installed.join(QStringLiteral(", "))));
-    return false;
-}
-
-QStringList TrainingSimulatorController::_installedWslDistributions(const QString &wsl) const
-{
-    QProcess process;
-    process.setWorkingDirectory(QDir::tempPath());
-    process.start(wsl, {QStringLiteral("--list"), QStringLiteral("--quiet")});
-    if (!process.waitForStarted(3000) || !process.waitForFinished(5000)
-        || process.exitStatus() != QProcess::NormalExit || process.exitCode() != 0) {
-        if (process.state() != QProcess::NotRunning) {
-            process.kill();
-            process.waitForFinished(500);
-        }
-        return {};
-    }
-
-    const QByteArray bytes = process.readAllStandardOutput();
-    QString output;
-    if (bytes.contains('\0')) {
-        QStringDecoder decoder(QStringDecoder::Utf16LE);
-        output = decoder.decode(bytes);
-    } else {
-        output = QString::fromLocal8Bit(bytes);
-    }
-
-    output.replace(QLatin1Char('\r'), QLatin1Char('\n'));
-    QStringList distributions;
-    const QStringList lines = output.split(QLatin1Char('\n'), Qt::SkipEmptyParts);
-    for (const QString &line : lines) {
-        const QString name = line.trimmed();
-        if (!name.isEmpty()) {
-            distributions.append(name);
-        }
-    }
-    return distributions;
-}
-
-bool TrainingSimulatorController::_checkWslEnvironment(const QString &wsl, QString *windowsHostAddress)
-{
-    QProcess probe;
-    probe.setProcessChannelMode(QProcess::MergedChannels);
-    probe.setWorkingDirectory(QDir::tempPath());
-    probe.start(wsl, {QStringLiteral("-d"), _wslDistribution, QStringLiteral("--exec"),
-                      QStringLiteral("bash"), QStringLiteral("-lc"), _buildEnvironmentProbeCommand()});
-    if (!probe.waitForStarted(5000)) {
-        _setError(tr("无法启动 WSL 发行版“%1”：%2").arg(_wslDistribution, probe.errorString()));
-        return false;
-    }
-    if (!probe.waitForFinished(15000)) {
-        probe.kill();
-        probe.waitForFinished(1000);
-        _setError(tr("WSL 环境检查超时。请先在 PowerShell 中运行 wsl -d %1，确认该发行版可以正常启动。")
-                      .arg(_wslDistribution));
-        return false;
-    }
-
-    const QByteArray output = probe.readAll();
-    _appendLog(tr("环境"), output);
-    if (probe.exitStatus() != QProcess::NormalExit || probe.exitCode() != 0) {
-        QString detail = QString::fromUtf8(output).trimmed();
-        if (detail.size() > 800) {
-            detail = detail.right(800);
-        }
-        _setError(tr("WSL/SITL 环境检查失败（退出码 %1）：%2")
-                      .arg(probe.exitCode()).arg(detail));
-        return false;
-    }
-
-    const QString outputText = QString::fromUtf8(output);
-    const QString hostMarker = QStringLiteral("QGC_WINDOWS_HOST=");
-    for (const QString &line : outputText.split(QLatin1Char('\n'), Qt::SkipEmptyParts)) {
-        if (line.startsWith(hostMarker)) {
-            *windowsHostAddress = line.mid(hostMarker.size()).trimmed();
-            break;
-        }
-    }
-    if (windowsHostAddress->isEmpty()) {
-        _setError(tr("WSL 环境检查没有返回 Windows 主机地址。"));
-        return false;
-    }
-    return true;
-}
-
-bool TrainingSimulatorController::_checkWslUdpReachability(const QString &wsl, const QString &windowsHostAddress)
-{
-    QUdpSocket receiver;
-    if (!receiver.bind(QHostAddress::AnyIPv4, 0)) {
-        _setError(tr("无法创建 WSL 网络自检端口：%1").arg(receiver.errorString()));
-        return false;
-    }
-
-    const QByteArray expected("QGC_SIM_PROBE");
-    const QString sendCommand = QStringLiteral("printf QGC_SIM_PROBE > /dev/udp/%1/%2")
-                                    .arg(windowsHostAddress).arg(receiver.localPort());
-    QProcess sender;
-    sender.setProcessChannelMode(QProcess::MergedChannels);
-    sender.setWorkingDirectory(QDir::tempPath());
-    sender.start(wsl, {QStringLiteral("-d"), _wslDistribution, QStringLiteral("--exec"),
-                       QStringLiteral("bash"), QStringLiteral("-lc"), sendCommand});
-    if (!sender.waitForStarted(3000) || !sender.waitForFinished(5000)
-        || sender.exitStatus() != QProcess::NormalExit || sender.exitCode() != 0) {
-        if (sender.state() != QProcess::NotRunning) {
-            sender.kill();
-            sender.waitForFinished(500);
-        }
-        _setError(tr("WSL 无法向 Windows 发送 UDP 自检数据：%1")
-                      .arg(QString::fromUtf8(sender.readAll()).trimmed()));
-        return false;
-    }
-    if (!receiver.hasPendingDatagrams() && !receiver.waitForReadyRead(3000)) {
-        _setError(tr("Windows 未收到来自 WSL 的 UDP 自检数据。请检查 Windows 防火墙是否允许 QGroundControl 接收专用网络数据。"));
-        return false;
-    }
-
-    QByteArray datagram;
-    datagram.resize(static_cast<qsizetype>(receiver.pendingDatagramSize()));
-    if (receiver.readDatagram(datagram.data(), datagram.size()) != datagram.size() || datagram != expected) {
-        _setError(tr("收到的 WSL UDP 自检数据不完整。"));
-        return false;
-    }
-    _appendLog(tr("环境"), tr("WSL → Windows UDP 通信正常。\n").toUtf8());
-    return true;
-}
-
-QString TrainingSimulatorController::_extractTargetScript()
-{
-    QFile source(QStringLiteral(":/training/simulate_rtk_nmea_udp.py"));
-    if (!source.open(QIODevice::ReadOnly)) {
-        _setError(tr("无法读取内置小车仿真脚本。"));
-        return QString();
-    }
-    const QByteArray contents = source.readAll();
-    const QString directory = QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation)
-                              + QStringLiteral("/training");
-    if (!QDir().mkpath(directory)) {
-        _setError(tr("无法创建仿真脚本缓存目录：%1").arg(directory));
-        return QString();
-    }
-    const QString path = directory + QStringLiteral("/simulate_rtk_nmea_udp.py");
-    QFile current(path);
-    if (current.open(QIODevice::ReadOnly) && current.readAll() == contents) {
-        return path;
-    }
-    QSaveFile output(path);
-    if (!output.open(QIODevice::WriteOnly) || output.write(contents) != contents.size() || !output.commit()) {
-        _setError(tr("无法释放小车仿真脚本到：%1").arg(path));
-        return QString();
-    }
-    return path;
-}
-
-QString TrainingSimulatorController::_resolvePythonExecutable(QString *versionText) const
+QString TrainingSimulatorController::_resolveSitlExecutable() const
 {
     QStringList candidates;
-    if (!_pythonExecutable.trimmed().isEmpty()) {
-        candidates << _pythonExecutable.trimmed();
+    if (!_sitlExecutable.trimmed().isEmpty()) {
+        candidates << _sitlExecutable.trimmed();
     }
-    candidates << QStringLiteral("py.exe") << QStringLiteral("py")
-               << QStringLiteral("python3.exe") << QStringLiteral("python3")
-               << QStringLiteral("python.exe") << QStringLiteral("python");
+    const QString environmentExecutable = qEnvironmentVariable("AEROFOLLOW_SITL_EXE").trimmed();
+    if (!environmentExecutable.isEmpty()) {
+        candidates << environmentExecutable;
+    }
+    const QString appDirectory = QCoreApplication::applicationDirPath();
+    candidates << QDir(appDirectory).filePath(QStringLiteral("simulator/bin/arduplane.exe"))
+               << QDir(appDirectory).filePath(QStringLiteral("../simulator/bin/arduplane.exe"));
 
-    QStringList checkedPaths;
     for (const QString &candidate : candidates) {
-        const QString executable = _resolveExecutable(candidate, QStringList{});
-        if (executable.isEmpty() || checkedPaths.contains(executable, Qt::CaseInsensitive)) {
-            continue;
-        }
-        checkedPaths << executable;
-
-        QStringList arguments;
-        if (QFileInfo(executable).completeBaseName().compare(QStringLiteral("py"), Qt::CaseInsensitive) == 0) {
-            arguments << QStringLiteral("-3");
-        }
-        arguments << QStringLiteral("-c")
-                  << QStringLiteral("import sys; print('.'.join(map(str, sys.version_info[:3]))); "
-                                    "raise SystemExit(0 if sys.version_info >= (3, 9) else 9)");
-
-        QProcess probe;
-        probe.setProcessChannelMode(QProcess::MergedChannels);
-        probe.setWorkingDirectory(QDir::tempPath());
-        probe.start(executable, arguments);
-        if (!probe.waitForStarted(3000) || !probe.waitForFinished(5000)) {
-            probe.kill();
-            probe.waitForFinished(500);
-            continue;
-        }
-        const QString version = QString::fromLocal8Bit(probe.readAll()).trimmed();
-        if (probe.exitStatus() == QProcess::NormalExit && probe.exitCode() == 0) {
-            if (versionText) {
-                *versionText = version;
-            }
-            return executable;
-        }
-    }
-    return QString();
-}
-
-QString TrainingSimulatorController::_resolveExecutable(const QString &configured, const QStringList &fallbacks) const
-{
-    const QString trimmed = configured.trimmed();
-    if (!trimmed.isEmpty()) {
-        const QFileInfo info(trimmed);
-        if (info.isAbsolute() && info.isExecutable()) {
+        const QFileInfo info(QDir::cleanPath(candidate));
+        if (info.isFile() && info.isExecutable()) {
             return info.absoluteFilePath();
         }
-        const QString found = QStandardPaths::findExecutable(trimmed);
-        if (!found.isEmpty()) {
-            return found;
-        }
-    }
-    for (const QString &fallback : fallbacks) {
-        const QString found = QStandardPaths::findExecutable(fallback);
-        if (!found.isEmpty()) {
-            return found;
-        }
     }
     return QString();
 }
 
-QString TrainingSimulatorController::_buildEnvironmentProbeCommand() const
+QString TrainingSimulatorController::_runtimeRootForExecutable(const QString &executable) const
 {
-    return QStringLiteral(
-               "set -e\n"
-               "ardupilot_dir=%1\n"
-               "if [ ! -d \"$ardupilot_dir\" ]; then echo \"ERROR: ArduPilot path not found: $ardupilot_dir\"; exit 20; fi\n"
-               "if [ ! -x \"$ardupilot_dir/Tools/autotest/sim_vehicle.py\" ]; then "
-               "echo \"ERROR: sim_vehicle.py is missing or not executable\"; exit 21; fi\n"
-               "for tool in bash python3 g++ setsid pgrep sed awk head; do if ! command -v \"$tool\" >/dev/null 2>&1; then "
-               "echo \"ERROR: required WSL command is missing: $tool\"; exit 22; fi; done\n"
-               "if ! (cd \"$ardupilot_dir\" && Tools/autotest/sim_vehicle.py --help >/dev/null 2>&1); then "
-               "echo \"ERROR: sim_vehicle.py dependency check failed\"; exit 24; fi\n"
-               "networking_mode=unknown\n"
-               "if command -v wslinfo >/dev/null 2>&1; then "
-               "networking_mode=\"$(wslinfo --networking-mode 2>/dev/null || echo unknown)\"; fi\n"
-               "if [ \"$networking_mode\" = mirrored ]; then windows_host=127.0.0.1; else "
-               "if ! command -v ip >/dev/null 2>&1; then echo \"ERROR: required WSL command is missing: ip\"; exit 22; fi; "
-               "windows_host=\"$(ip -4 route show default 2>/dev/null | sed -n 's/^default via \\([^ ]*\\).*/\\1/p' | head -n 1)\"; "
-               "if [ -z \"$windows_host\" ]; then windows_host=\"$(awk '/^nameserver[[:space:]]+/ { print $2; exit }' "
-               "/etc/resolv.conf 2>/dev/null)\"; fi; fi\n"
-               "if [ -z \"$windows_host\" ]; then echo \"ERROR: cannot determine the Windows host address\"; exit 23; fi\n"
-               "case \"$windows_host\" in *[!0-9.]*|'') echo \"ERROR: invalid Windows host address: $windows_host\"; exit 23;; esac\n"
-               "printf 'WSL kernel: %s\\n' \"$(uname -r)\"\n"
-               "printf 'WSL networking mode: %s\\n' \"$networking_mode\"\n"
-               "printf 'Windows host address: %s\\n' \"$windows_host\"\n"
-               "printf 'QGC_WINDOWS_HOST=%s\\n' \"$windows_host\"\n"
-               "printf 'ArduPilot path: %s\\n' \"$ardupilot_dir\"\n")
-        .arg(_shellQuote(_ardupilotPath));
+    QDir binaryDirectory = QFileInfo(executable).absoluteDir();
+    if (binaryDirectory.dirName().compare(QStringLiteral("bin"), Qt::CaseInsensitive) == 0) {
+        binaryDirectory.cdUp();
+    }
+    return binaryDirectory.absolutePath();
 }
 
-QString TrainingSimulatorController::_buildPlaneCommand() const
+bool TrainingSimulatorController::_prepareEnvironment(QString &executable, QString &quadplaneDefaults,
+                                                       QString &followDefaults, QString &runtimeDirectory)
 {
-    const QString location = QStringLiteral("%1,%2,%3,%4")
-                                 .arg(QString::number(_latitude, 'f', 8),
-                                      QString::number(_longitude, 'f', 8),
-                                      QString::number(_altitude, 'f', 2),
-                                      QString::number(_heading, 'f', 1));
-    const QString wipeArgument = _wipeEeprom ? QStringLiteral(" -w") : QString();
-    return QStringLiteral(
-               "set -e\n"
-               "cd -- %1\n"
-               "unset DISPLAY WAYLAND_DISPLAY\n"
-               "networking_mode=unknown\n"
-               "if command -v wslinfo >/dev/null 2>&1; then networking_mode=\"$(wslinfo --networking-mode 2>/dev/null || echo unknown)\"; fi\n"
-               "if [ \"$networking_mode\" = mirrored ]; then gateway=127.0.0.1; else "
-               "gateway=\"$(ip -4 route show default 2>/dev/null | sed -n 's/^default via \\([^ ]*\\).*/\\1/p' | head -n 1)\"; "
-               "if [ -z \"$gateway\" ]; then gateway=\"$(awk '/^nameserver[[:space:]]+/ { print $2; exit }' "
-               "/etc/resolv.conf 2>/dev/null)\"; fi; fi\n"
-               "if [ -z \"$gateway\" ]; then echo 'Cannot determine the Windows host address.' >&2; exit 3; fi\n"
-               "echo \"QGC Windows host IP: $gateway\"\n"
-               "param_file=/tmp/qgc_training_follow.params\n"
-               "pid_file=%2\n"
-               "printf 'FOLL_ENABLE,1\\nFT_SYSID,255\\n' > \"$param_file\"\n"
-               "rm -f \"$pid_file\"\n"
-               "printf '%s\\n' \"$$\" > \"$pid_file\"\n"
-               "trap 'rm -f \"$pid_file\"' EXIT\n"
-               "./waf configure --board sitl\n"
-               "./waf build --target bin/arduplane\n"
-               "exec build/sitl/bin/arduplane -S%3 --model quadplane --speedup 1 --sysid 1 --slave 0 "
-               "--defaults \"Tools/autotest/default_params/quadplane.parm,$param_file\" "
-               "--sim-address 127.0.0.1 -I0 --home %4 --serial0 \"udpclient:$gateway:14550\"\n")
-        .arg(_shellQuote(_ardupilotPath), _shellQuote(QString::fromLatin1(kPidFile)), wipeArgument, _shellQuote(location));
+    executable = _resolveSitlExecutable();
+    if (executable.isEmpty()) {
+        _setError(tr("未找到预编译飞机仿真程序。安装包必须包含 simulator\\bin\\arduplane.exe，"
+                     "开发环境也可设置 AEROFOLLOW_SITL_EXE。"));
+        return false;
+    }
+
+    const QString packageRoot = _runtimeRootForExecutable(executable);
+    quadplaneDefaults = QDir(packageRoot).filePath(QStringLiteral("params/quadplane.parm"));
+    followDefaults = QDir(packageRoot).filePath(QStringLiteral("params/aerofollow.parm"));
+    const QString cygwinRuntime = QFileInfo(executable).absoluteDir().filePath(QStringLiteral("cygwin1.dll"));
+    QStringList missing;
+    for (const QString &path : {quadplaneDefaults, followDefaults, cygwinRuntime}) {
+        if (!QFileInfo::exists(path)) {
+            missing << QDir::toNativeSeparators(path);
+        }
+    }
+    if (!missing.isEmpty()) {
+        _setError(tr("飞机仿真运行包不完整，缺少：%1").arg(missing.join(QStringLiteral("；"))));
+        return false;
+    }
+
+    runtimeDirectory = QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation)
+                       + QStringLiteral("/training/sitl");
+    if (!QDir().mkpath(runtimeDirectory)) {
+        _setError(tr("无法创建 SITL 可写运行目录：%1").arg(QDir::toNativeSeparators(runtimeDirectory)));
+        return false;
+    }
+
+    _appendLog(tr("环境"), tr("SITL：%1\n参数：%2；%3\n运行目录：%4\n")
+                                  .arg(QDir::toNativeSeparators(executable),
+                                       QDir::toNativeSeparators(quadplaneDefaults),
+                                       QDir::toNativeSeparators(followDefaults),
+                                       QDir::toNativeSeparators(runtimeDirectory)).toUtf8());
+    _appendLog(tr("环境"), tr("运行包已就绪：客户机不需要 WSL、ArduPilot 源码、Python 或编译工具。\n").toUtf8());
+    return true;
 }
 
-QString TrainingSimulatorController::_shellQuote(QString value)
+QByteArray TrainingSimulatorController::_nmeaSentence(const QString &body)
 {
-    value.replace(QLatin1Char('\''), QStringLiteral("'\"'\"'"));
-    return QLatin1Char('\'') + value + QLatin1Char('\'');
+    const QByteArray bytes = body.toLatin1();
+    quint8 checksum = 0;
+    for (const char value : bytes) {
+        checksum ^= static_cast<quint8>(value);
+    }
+    return QByteArray("$") + bytes + QByteArray("*")
+           + QByteArray::number(checksum, 16).rightJustified(2, '0').toUpper() + QByteArray("\r\n");
+}
+
+QString TrainingSimulatorController::_nmeaCoordinate(double value, bool latitude, QChar &direction)
+{
+    direction = value < 0.0 ? (latitude ? QLatin1Char('S') : QLatin1Char('W'))
+                            : (latitude ? QLatin1Char('N') : QLatin1Char('E'));
+    const double absoluteValue = std::abs(value);
+    const int degrees = static_cast<int>(absoluteValue);
+    const double minutes = (absoluteValue - degrees) * 60.0;
+    return QStringLiteral("%1%2")
+        .arg(degrees, latitude ? 2 : 3, 10, QLatin1Char('0'))
+        .arg(minutes, 11, 'f', 8, QLatin1Char('0'));
+}
+
+void TrainingSimulatorController::_sendTargetPosition()
+{
+    if (!_targetElapsed.isValid()) {
+        return;
+    }
+    const double elapsed = _targetElapsed.nsecsElapsed() / 1000000000.0;
+    double north = 0.0;
+    double east = 0.0;
+    double northVelocity = 0.0;
+    double eastVelocity = 0.0;
+
+    if (_targetPattern == QStringLiteral("circle")) {
+        const double angularRate = _targetSpeed / qMax(_targetRadius, 1.0);
+        const double theta = angularRate * elapsed;
+        north = _targetRadius * std::sin(theta);
+        east = _targetRadius * std::cos(theta);
+        northVelocity = _targetSpeed * std::cos(theta);
+        eastVelocity = -_targetSpeed * std::sin(theta);
+    } else if (_targetPattern == QStringLiteral("east") || _targetPattern == QStringLiteral("north")) {
+        const double heading = _targetPattern == QStringLiteral("east") ? 90.0 : 0.0;
+        const double headingRadians = qDegreesToRadians(heading);
+        northVelocity = _targetSpeed * std::cos(headingRadians);
+        eastVelocity = _targetSpeed * std::sin(headingRadians);
+        north = northVelocity * elapsed;
+        east = eastVelocity * elapsed;
+    } else {
+        constexpr double lineLength = 80.0;
+        const double period = (2.0 * lineLength) / qMax(_targetSpeed, 0.01);
+        const double phase = std::fmod(elapsed, period);
+        const bool outbound = phase <= period / 2.0;
+        const double distance = outbound ? phase * _targetSpeed
+                                         : lineLength - ((phase - period / 2.0) * _targetSpeed);
+        east = distance;
+        eastVelocity = _targetSpeed * (outbound ? 1.0 : -1.0);
+    }
+
+    const double targetLatitude = _latitude + qRadiansToDegrees(north / kEarthRadiusMeters);
+    const double targetLongitude = _longitude
+        + qRadiansToDegrees(east / (kEarthRadiusMeters * std::cos(qDegreesToRadians(_latitude))));
+    const double speed = std::hypot(northVelocity, eastVelocity);
+    const double course = courseFromVelocity(northVelocity, eastVelocity);
+    const QDateTime now = QDateTime::currentDateTimeUtc();
+    const QString time = now.toString(QStringLiteral("hhmmss"))
+                         + QStringLiteral(".%1").arg(now.time().msec() / 10, 2, 10, QLatin1Char('0'));
+    const QString date = now.toString(QStringLiteral("ddMMyy"));
+    QChar latitudeDirection;
+    QChar longitudeDirection;
+    const QString latitude = _nmeaCoordinate(targetLatitude, true, latitudeDirection);
+    const QString longitude = _nmeaCoordinate(targetLongitude, false, longitudeDirection);
+
+    const QString gga = QStringLiteral("GNGGA,%1,%2,%3,%4,%5,4,22,0.8,%6,M,-4.0100,M,,")
+                            .arg(time).arg(latitude).arg(latitudeDirection).arg(longitude).arg(longitudeDirection)
+                            .arg(_altitude, 0, 'f', 4);
+    const QString rmc = QStringLiteral("GNRMC,%1,A,%2,%3,%4,%5,%6,%7,%8,5.8,W,A,S")
+                            .arg(time).arg(latitude).arg(latitudeDirection).arg(longitude).arg(longitudeDirection)
+                            .arg(speed * kKnotsPerMeterPerSecond, 0, 'f', 3)
+                            .arg(course, 0, 'f', 1)
+                            .arg(date);
+    const QByteArray packet = _nmeaSentence(gga) + _nmeaSentence(rmc);
+    if (_targetSocket.writeDatagram(packet, QHostAddress::LocalHost, static_cast<quint16>(_nmeaPort)) != packet.size()) {
+        _setError(tr("小车 NMEA UDP 发送失败：%1").arg(_targetSocket.errorString()));
+        QTimer::singleShot(0, this, &TrainingSimulatorController::stopTargetSimulation);
+        return;
+    }
+
+    const qint64 elapsedSecond = static_cast<qint64>(elapsed);
+    if (elapsedSecond != _lastTargetLogSecond) {
+        _lastTargetLogSecond = elapsedSecond;
+        _appendLog(tr("小车"), tr("t=%1s lat=%2 lon=%3 alt=%4m speed=%5m/s course=%6deg\n")
+                                      .arg(elapsed, 0, 'f', 1)
+                                      .arg(targetLatitude, 0, 'f', 8)
+                                      .arg(targetLongitude, 0, 'f', 8)
+                                      .arg(_altitude, 0, 'f', 1)
+                                      .arg(speed, 0, 'f', 2)
+                                      .arg(course, 0, 'f', 1).toUtf8());
+    }
 }

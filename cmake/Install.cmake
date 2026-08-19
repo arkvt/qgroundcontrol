@@ -65,6 +65,17 @@ elseif(LINUX)
     )
     install(SCRIPT "${CMAKE_SOURCE_DIR}/cmake/CreateAppImage.cmake")
 elseif(WIN32)
+    if(QGC_WINDOWS_SITL_PACKAGE)
+        if(NOT EXISTS "${QGC_WINDOWS_SITL_PACKAGE}/bin/arduplane.exe"
+           OR NOT EXISTS "${QGC_WINDOWS_SITL_PACKAGE}/bin/cygwin1.dll"
+           OR NOT EXISTS "${QGC_WINDOWS_SITL_PACKAGE}/params/quadplane.parm"
+           OR NOT EXISTS "${QGC_WINDOWS_SITL_PACKAGE}/params/aerofollow.parm")
+            message(FATAL_ERROR "QGC_WINDOWS_SITL_PACKAGE is incomplete: ${QGC_WINDOWS_SITL_PACKAGE}")
+        endif()
+        install(DIRECTORY "${QGC_WINDOWS_SITL_PACKAGE}/" DESTINATION "${CMAKE_INSTALL_BINDIR}/simulator")
+    else()
+        message(WARNING "No QGC_WINDOWS_SITL_PACKAGE configured; the Windows installer will not contain SITL")
+    endif()
     install(CODE "set(CMAKE_PROJECT_NAME ${CMAKE_PROJECT_NAME})")
     install(CODE "set(QGC_ORG_NAME ${QGC_ORG_NAME})")
     install(CODE "set(QGC_WINDOWS_ICON_PATH ${QGC_WINDOWS_ICON_PATH})")

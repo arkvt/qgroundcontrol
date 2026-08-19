@@ -35,6 +35,7 @@ Item {
     property var parentToolInsets               // These insets tell you what screen real estate is available for positioning the controls in your overlay
     property var totalToolInsets:   _toolInsets // These are the insets for your custom overlay additions
     property var mapControl
+    property var missionController
 
     property var _activeVehicle: QGroundControl.multiVehicleManager.activeVehicle
     readonly property bool _customLandingVisible: customLandingController.modeActive
@@ -66,6 +67,7 @@ Item {
         id: customLandingMapVisual
         map: _root.mapControl
         controller: customLandingController
+        missionController: _root.missionController
         active: _root._customLandingVisible
     }
 
@@ -99,6 +101,7 @@ Item {
         id: followReturnMapVisual
         map: _root.mapControl
         controller: followReturnVisualController
+        missionController: _root.missionController
         active: _root._followReturnVisible
         entryCoordinate: customLandingController.followReturnEntryCoordinate
         readOnly: true

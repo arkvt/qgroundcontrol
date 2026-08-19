@@ -10,6 +10,7 @@ option(QGC_ENABLE_HERELINK "Enable Herelink Support" OFF)
 
 # App
 set(QGC_APP_NAME "QGroundControl" CACHE STRING "App Name")
+set(QGC_WINDOWS_SITL_PACKAGE "" CACHE PATH "Precompiled ArduPlane SITL Windows runtime package")
 set(QGC_APP_COPYRIGHT "Copyright (c) 2025 QGroundControl. All rights reserved." CACHE STRING "Copyright")
 set(QGC_APP_DESCRIPTION "Open Source Ground Control App" CACHE STRING "Description")
 set(QGC_ORG_NAME "QGroundControl" CACHE STRING "Org Name")

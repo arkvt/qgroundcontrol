@@ -10,6 +10,7 @@ libs/lib/Frameworks/GStreamer.framework
 CMakeFiles
 tags
 build*/
+artifacts
 obj
 .DS_Store
 *.log

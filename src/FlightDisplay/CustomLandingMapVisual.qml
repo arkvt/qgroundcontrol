@@ -27,6 +27,7 @@ Item {
 
     property var map
     property var controller
+    property var missionController
     property bool active: false
     property var entryCoordinate: QtPositioning.coordinate()
     property bool readOnly: false
@@ -80,6 +81,32 @@ Item {
     readonly property color loiterPathColor:   "#ffd400"
     readonly property real  loiterPathOpacity: 0.40
     readonly property real  mapBearing: map && isFinite(Number(map.bearing)) ? Number(map.bearing) : 0
+    // Keep custom landing labels contiguous with the mission item sequence.
+    // MissionSettingsItem uses sequence 0, so an empty mission starts at 1.
+    readonly property int missionPointBaseIndex: {
+        var maxSequence = 0
+        var items = missionController && missionController.visualItems
+        if (!items) {
+            return maxSequence + 1
+        }
+
+        for (var i = 0; i < items.count; i++) {
+            var item = items.get(i)
+            if (!item) {
+                continue
+            }
+
+            var sequence = Number(item.lastSequenceNumber)
+            if (!isFinite(sequence)) {
+                sequence = Number(item.sequenceNumber)
+            }
+            if (isFinite(sequence)) {
+                maxSequence = Math.max(maxSequence, sequence)
+            }
+        }
+
+        return maxSequence + 1
+    }
 
     property var _mapClickArea
     property var _loiterMarker
@@ -630,7 +657,7 @@ Item {
 
             sourceItem: MissionItemIndexLabel {
                 id: loiterMarkerSource
-                index: 2
+                index: _root.missionPointBaseIndex + 1
                 label: qsTr("Loiter descent") + "  +"
                        + Number(_root.controller.loiterHeightAboveLanding).toFixed(1) + " " + qsTr("m")
                 checked: _root._selectedMarker === 2
@@ -657,7 +684,7 @@ Item {
 
             sourceItem: MissionItemIndexLabel {
                 id: landingMarkerSource
-                index: 1
+                index: _root.missionPointBaseIndex
                 label: qsTr("Vertical land") + "  "
                        + (isFinite(Number(_root.controller.landingElevation))
                               ? Number(_root.controller.landingElevation).toFixed(1) + " " + qsTr("m AMSL")

@@ -1,0 +1,48 @@
+/home/ubuntu/ardupilot/ArduPlane/Attitude.cpp:532:    int32_t bearing_error_cd = nav_controller->bearing_error_cd();
+/home/ubuntu/ardupilot/ArduPlane/Attitude.cpp:607:    int32_t commanded_roll = nav_controller->nav_roll_cd();
+/home/ubuntu/ardupilot/ArduPlane/mode_rtl.cpp:154:    if (plane.nav_controller->reached_loiter_target() ||
+/home/ubuntu/ardupilot/ArduPlane/altitude.cpp:643:        bearing_cd = nav_controller->target_bearing_cd();
+/home/ubuntu/ardupilot/ArduPlane/mode_cruise.cpp:89:        plane.nav_controller->update_waypoint(plane.prev_WP_loc, plane.next_WP_loc);
+/home/ubuntu/ardupilot/ArduPlane/mode.cpp:126:        plane.nav_controller->set_data_is_stale();
+/home/ubuntu/ardupilot/ArduPlane/mode_loiter.cpp:46:    const float loiter_radius = plane.nav_controller->loiter_radius(fabsf(plane.loiter.radius));
+/home/ubuntu/ardupilot/ArduPlane/navigation.cpp:22:    const int32_t target_bearing_cd = nav_controller->target_bearing_cd();
+/home/ubuntu/ardupilot/ArduPlane/navigation.cpp:349:         current_loc.get_distance(next_WP_loc) > 3 * nav_controller->loiter_radius(radius)) ||
+/home/ubuntu/ardupilot/ArduPlane/navigation.cpp:359:        nav_controller->update_waypoint(prev_WP_loc, next_WP_loc);
+/home/ubuntu/ardupilot/ArduPlane/navigation.cpp:362:    nav_controller->update_loiter(next_WP_loc, radius, loiter.direction);
+/home/ubuntu/ardupilot/ArduPlane/navigation.cpp:485:    return nav_controller->reached_loiter_target();
+/home/ubuntu/ardupilot/ArduPlane/ArduPlane.cpp:864:    bearing = nav_controller->target_bearing_cd() * 0.01;
+/home/ubuntu/ardupilot/ArduPlane/ArduPlane.cpp:880:    xtrack_error = nav_controller->crosstrack_error();
+/home/ubuntu/ardupilot/ArduPlane/mode_follow_return.cpp:140:        plane.nav_controller->loiter_radius(fabsf(plan.signed_radius_m));
+/home/ubuntu/ardupilot/ArduPlane/commands_logic.cpp:21:        nav_controller->set_data_is_stale();
+/home/ubuntu/ardupilot/ArduPlane/commands_logic.cpp:599:        nav_controller->update_heading_hold(steer_state.hold_course_cd);
+/home/ubuntu/ardupilot/ArduPlane/commands_logic.cpp:601:        nav_controller->update_level_flight();        
+/home/ubuntu/ardupilot/ArduPlane/commands_logic.cpp:659:        nav_controller->update_waypoint(prev_WP_loc, flex_next_WP_loc);
+/home/ubuntu/ardupilot/ArduPlane/commands_logic.cpp:661:        nav_controller->update_waypoint(current_loc, flex_next_WP_loc);
+/home/ubuntu/ardupilot/ArduPlane/commands_logic.cpp:682:        acceptance_distance_m = nav_controller->turn_distance(get_wp_radius(), auto_state.next_turn_angle);
+/home/ubuntu/ardupilot/ArduPlane/commands_logic.cpp:830:        nav_controller->update_heading_hold(steer_state.hold_course_cd);
+/home/ubuntu/ardupilot/ArduPlane/commands_logic.cpp:841:        nav_controller->update_waypoint(prev_WP_loc, next_WP_loc);
+/home/ubuntu/ardupilot/ArduPlane/commands_logic.cpp:1083:                nav_controller->update_loiter(cmd.content.location, abs_radius, direction);
+/home/ubuntu/ardupilot/ArduPlane/commands_logic.cpp:1094:                nav_controller->update_loiter(cmd.content.location, abs_radius, direction);
+/home/ubuntu/ardupilot/ArduPlane/commands_logic.cpp:1111:                    nav_controller->update_loiter(cmd.content.location, abs_radius, direction);
+/home/ubuntu/ardupilot/ArduPlane/commands_logic.cpp:1119:                nav_controller->update_loiter(cmd.content.location, radius, direction);
+/home/ubuntu/ardupilot/ArduPlane/commands_logic.cpp:1144:                nav_controller->update_waypoint(start, end);
+/home/ubuntu/ardupilot/ArduPlane/mode_LoiterAltQLand.cpp:14:    const bool already_in_a_loiter = plane.nav_controller->reached_loiter_target() && !plane.nav_controller->data_is_stale();
+/home/ubuntu/ardupilot/ArduPlane/mode_LoiterAltQLand.cpp:36:    if ((!plane.current_loc.get_alt_distance(plane.next_WP_loc, dist) || is_negative(dist)) && plane.nav_controller->reached_loiter_target()) {
+/home/ubuntu/ardupilot/ArduPlane/quadplane.cpp:2403:        plane.nav_controller->update_waypoint(plane.auto_state.crosstrack ? plane.prev_WP_loc : plane.current_loc, loc);
+/home/ubuntu/ardupilot/ArduPlane/quadplane.cpp:2587:        plane.nav_controller->update_waypoint(plane.current_loc, loc);
+/home/ubuntu/ardupilot/ArduPlane/quadplane.cpp:2715:        plane.nav_controller->update_waypoint(plane.current_loc, loc);
+/home/ubuntu/ardupilot/ArduPlane/quadplane.cpp:3335:    plane.nav_controller->update_waypoint(plane.current_loc, plane.next_WP_loc);
+/home/ubuntu/ardupilot/ArduPlane/quadplane.cpp:3388:    plane.nav_controller->update_waypoint(plane.auto_state.crosstrack ? plane.prev_WP_loc : plane.current_loc,
+/home/ubuntu/ardupilot/ArduPlane/Log.cpp:181:        target_bearing_cd   : (int16_t)nav_controller->target_bearing_cd(),
+/home/ubuntu/ardupilot/ArduPlane/Log.cpp:182:        nav_bearing_cd      : (int16_t)nav_controller->nav_bearing_cd(),
+/home/ubuntu/ardupilot/ArduPlane/Log.cpp:184:        xtrack_error        : nav_controller->crosstrack_error(),
+/home/ubuntu/ardupilot/ArduPlane/Log.cpp:185:        xtrack_error_i      : nav_controller->crosstrack_error_integrator(),
+/home/ubuntu/ardupilot/ArduPlane/GCS_Mavlink.cpp:237:            nav_controller->nav_bearing_cd() * 0.01,
+/home/ubuntu/ardupilot/ArduPlane/GCS_Mavlink.cpp:238:            nav_controller->target_bearing_cd() * 0.01,
+/home/ubuntu/ardupilot/ArduPlane/GCS_Mavlink.cpp:242:            nav_controller->crosstrack_error());
+/home/ubuntu/ardupilot/ArduPlane/GCS_Mavlink.cpp:1627:        return wrap_360_cd(nav_controller->target_bearing_cd() ) / 200;
+/home/ubuntu/ardupilot/ArduPlane/mode_custom_land.cpp:298:    const float radius_m = plane.nav_controller->loiter_radius(requested_radius_m);
+/home/ubuntu/ardupilot/ArduPlane/mode_custom_land.cpp:475:    const float effective_radius_m = plane.nav_controller->loiter_radius(requested_radius_m);
+/home/ubuntu/ardupilot/ArduPlane/mode_custom_land.cpp:702:    plane.nav_controller->update_waypoint(plane.prev_WP_loc, plane.next_WP_loc);
+/home/ubuntu/ardupilot/ArduPlane/mode_custom_land.cpp:711:    const float effective_radius_m = plane.nav_controller->loiter_radius(requested_radius_m);
+/home/ubuntu/ardupilot/ArduPlane/mode_custom_land.cpp:828:            const float effective_radius_m = plane.nav_controller->loiter_radius(radius_m);

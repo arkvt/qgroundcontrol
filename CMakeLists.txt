@@ -332,6 +332,9 @@ if(WIN32)
 
     if(MINGW)
         list(REMOVE_ITEM QGC_INSTALLER_SOURCE_WIN_FILES "${QGC_INSTALLER_SOURCE_WIN}/QGroundControl.rc")
+        # Aggregated Qt MOC sources can exceed the default COFF section limit
+        # in Debug builds. Enable the PE big-object format for MinGW targets.
+        target_compile_options(${CMAKE_PROJECT_NAME} PRIVATE -Wa,-mbig-obj)
     endif()
 
     target_sources(${CMAKE_PROJECT_NAME} PRIVATE ${QGC_INSTALLER_SOURCE_WIN_FILES})
@@ -554,13 +557,6 @@ qt_add_resources(${CMAKE_PROJECT_NAME} "qgcresources_cmake"
         resources/qtquickcontrols2.conf
         ${SDL_GAMECONTROLLERDB_PATH}
         ${QGC_GSTREAMER_SHADER_RESOURCES}
-)
-
-qt_add_resources(${CMAKE_PROJECT_NAME} "training_simulator_resources"
-    PREFIX "/training"
-    BASE "resources/training"
-    FILES
-        resources/training/simulate_rtk_nmea_udp.py
 )
 
 # cmake_print_variables(QT_ALL_PLUGIN_TYPES_FOUND_VIA_FIND_PACKAGE)
