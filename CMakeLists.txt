@@ -331,7 +331,27 @@ if(WIN32)
     endforeach()
 
     if(MINGW)
+        # Compiling the .rc file as a regular target source forwards every QGC
+        # include directory and definition to windres, exceeding the Windows
+        # command-line limit. Compile the icon resource separately with a
+        # minimal command and link the resulting COFF object.
+        set(QGC_WINDOWS_RESOURCE_OBJECT "${CMAKE_CURRENT_BINARY_DIR}/AeroFollowIcon.rc.obj")
+        add_custom_command(
+            OUTPUT "${QGC_WINDOWS_RESOURCE_OBJECT}"
+            COMMAND "${CMAKE_RC_COMPILER}" -O coff
+                    -i "${QGC_INSTALLER_SOURCE_WIN}/QGroundControl.rc"
+                    -o "${QGC_WINDOWS_RESOURCE_OBJECT}"
+            WORKING_DIRECTORY "${QGC_INSTALLER_SOURCE_WIN}"
+            DEPENDS
+                "${QGC_INSTALLER_SOURCE_WIN}/QGroundControl.rc"
+                "${QGC_INSTALLER_SOURCE_WIN}/WindowsQGC.ico"
+            VERBATIM
+        )
+        set_source_files_properties("${QGC_WINDOWS_RESOURCE_OBJECT}"
+            PROPERTIES GENERATED TRUE EXTERNAL_OBJECT TRUE)
         list(REMOVE_ITEM QGC_INSTALLER_SOURCE_WIN_FILES "${QGC_INSTALLER_SOURCE_WIN}/QGroundControl.rc")
+        list(APPEND QGC_INSTALLER_SOURCE_WIN_FILES "${QGC_WINDOWS_RESOURCE_OBJECT}")
+
         # Aggregated Qt MOC sources can exceed the default COFF section limit
         # in Debug builds. Enable the PE big-object format for MinGW targets.
         target_compile_options(${CMAKE_PROJECT_NAME} PRIVATE -Wa,-mbig-obj)
