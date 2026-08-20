@@ -89,7 +89,9 @@ function Resolve-AsciiPathForCygwin {
     $mappingTarget = Split-Path -Parent $resolved
     $existingMappings = (& subst.exe) -join "`n"
     $drive = 'U:'
-    $mappedPath = Join-Path $drive (Split-Path -Leaf $resolved)
+    # Do not use Join-Path before subst creates U:. PowerShell resolves the
+    # drive immediately and throws DriveNotFoundException after a reboot.
+    $mappedPath = "$drive\$(Split-Path -Leaf $resolved)"
     if ($existingMappings -match '(?im)^U:\\') {
         if ((Test-Path -LiteralPath (Join-Path $mappedPath 'waf') -PathType Leaf) -and
             (Test-Path -LiteralPath (Join-Path $mappedPath 'ArduPlane') -PathType Container)) {

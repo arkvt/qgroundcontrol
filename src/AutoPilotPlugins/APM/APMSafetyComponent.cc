@@ -39,6 +39,14 @@ QUrl APMSafetyComponent::setupSource() const
 {
     switch (_vehicle->vehicleType()) {
     case MAV_TYPE_FIXED_WING:
+    // ArduPlane QuadPlane variants use the same safety parameters as fixed-wing.
+    case MAV_TYPE_VTOL_TAILSITTER_DUOROTOR:
+    case MAV_TYPE_VTOL_TAILSITTER_QUADROTOR:
+    case MAV_TYPE_VTOL_TILTROTOR:
+    case MAV_TYPE_VTOL_FIXEDROTOR:
+    case MAV_TYPE_VTOL_TAILSITTER:
+    case MAV_TYPE_VTOL_TILTWING:
+    case MAV_TYPE_VTOL_RESERVED5:
     case MAV_TYPE_QUADROTOR:
     case MAV_TYPE_COAXIAL:
     case MAV_TYPE_HELICOPTER:
@@ -58,6 +66,13 @@ QUrl APMSafetyComponent::summaryQmlSource() const
 {
     switch (_vehicle->vehicleType()) {
     case MAV_TYPE_FIXED_WING:
+    case MAV_TYPE_VTOL_TAILSITTER_DUOROTOR:
+    case MAV_TYPE_VTOL_TAILSITTER_QUADROTOR:
+    case MAV_TYPE_VTOL_TILTROTOR:
+    case MAV_TYPE_VTOL_FIXEDROTOR:
+    case MAV_TYPE_VTOL_TAILSITTER:
+    case MAV_TYPE_VTOL_TILTWING:
+    case MAV_TYPE_VTOL_RESERVED5:
     case MAV_TYPE_QUADROTOR:
     case MAV_TYPE_COAXIAL:
     case MAV_TYPE_HELICOPTER:
