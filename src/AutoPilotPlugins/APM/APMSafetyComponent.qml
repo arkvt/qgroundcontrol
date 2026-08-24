@@ -35,6 +35,7 @@ SetupPage {
 
             property Fact _batt1Monitor:                    controller.getParameterFact(-1, "BATT_MONITOR")
             property Fact _batt2Monitor:                    controller.getParameterFact(-1, "BATT2_MONITOR", false /* reportMissing */)
+            property bool _planeLikeVehicle:                controller.vehicle.fixedWing || controller.vehicle.vtol
             property bool _batt2MonitorAvailable:           controller.parameterExists(-1, "BATT2_MONITOR")
             property bool _batt1MonitorEnabled:             _batt1Monitor.rawValue !== 0
             property bool _batt2MonitorEnabled:             _batt2MonitorAvailable ? _batt2Monitor.rawValue !== 0 : false
@@ -304,7 +305,7 @@ SetupPage {
             }
 
             Loader {
-                sourceComponent: controller.vehicle.fixedWing ? planeGeneralFS : undefined
+                sourceComponent: _planeLikeVehicle ? planeGeneralFS : undefined
             }
 
             Component {
@@ -596,7 +597,7 @@ SetupPage {
             }
 
             Loader {
-                sourceComponent: (controller.vehicle.multiRotor || controller.vehicle.fixedWing) && controller.parameterExists(-1, "FENCE_ENABLE") ? copterGeoFence : undefined
+                sourceComponent: (controller.vehicle.multiRotor || _planeLikeVehicle) && controller.parameterExists(-1, "FENCE_ENABLE") ? copterGeoFence : undefined
             }
 
             Component {
@@ -838,7 +839,7 @@ SetupPage {
             }
 
             Loader {
-                sourceComponent: controller.vehicle.fixedWing ? planeRTL : undefined
+                sourceComponent: _planeLikeVehicle ? planeRTL : undefined
             }
 
             Column {

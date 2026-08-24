@@ -28,6 +28,13 @@ Item {
     property bool _batt1FSCritActAvailable: controller.parameterExists(-1, "BATT_FS_CRT_ACT")
 
     property bool _roverFirmware:           controller.parameterExists(-1, "MODE1") // This catches all usage of ArduRover firmware vehicle types: Rover, Boat...
+    property bool _planeLikeVehicle:        controller.vehicle.fixedWing || controller.vehicle.vtol
+    property Fact _planeRtlAltitude: {
+        if (controller.firmwareMajorVersion < 4 || (controller.firmwareMajorVersion === 4 && controller.firmwareMinorVersion < 5)) {
+            return controller.getParameterFact(-1, "ALT_HOLD_RTL", false /* reportMissing */)
+        }
+        return controller.getParameterFact(-1, "RTL_ALTITUDE", false /* reportMissing */)
+    }
 
 
     Column {
@@ -51,7 +58,7 @@ Item {
         VehicleSummaryRow {
             labelText:  qsTr("Throttle failsafe:")
             valueText:  fact ? fact.enumStringValue : ""
-            visible:    controller.vehicle.fixedWing
+            visible:    _planeLikeVehicle
 
             property Fact fact: controller.getParameterFact(-1, "THR_FAILSAFE", false /* reportMissing */)
         }
@@ -108,7 +115,7 @@ Item {
             labelText: qsTr("GeoFence:")
             valueText: {
                 if(_copterFenceEnable && _copterFenceType) {
-                    if(_copterFenceEnable.value == 0 || _copterFenceType == 0) {
+                    if(_copterFenceEnable.value == 0 || _copterFenceType.value == 0) {
                         return qsTr("Disabled")
                     } else {
                         if(_copterFenceType.value == 1) {
@@ -122,7 +129,7 @@ Item {
                 }
                 return ""
             }
-            visible: controller.vehicle.multiRotor
+            visible: controller.vehicle.multiRotor || _planeLikeVehicle
         }
 
         VehicleSummaryRow {
@@ -130,7 +137,7 @@ Item {
             valueText: _copterFenceAction.value == 0 ?
                            qsTr("Report only") :
                            (_copterFenceAction.value == 1 ? qsTr("RTL or Land") : qsTr("Unknown"))
-            visible: controller.vehicle.multiRotor && _copterFenceEnable.value !== 0
+            visible: (controller.vehicle.multiRotor || _planeLikeVehicle) && _copterFenceEnable.value !== 0
         }
 
         VehicleSummaryRow {
@@ -144,9 +151,9 @@ Item {
         VehicleSummaryRow {
             labelText:  qsTr("RTL min alt:")
             valueText:  fact ? (fact.value < 0 ? qsTr("current") : fact.valueString + " " + fact.units) : ""
-            visible:    controller.vehicle.fixedWing
+            visible:    _planeLikeVehicle
 
-            property Fact fact: controller.getParameterFact(-1, "ALT_HOLD_RTL", false /* reportMissing */)
+            property Fact fact: _planeRtlAltitude
         }
     }
 }
