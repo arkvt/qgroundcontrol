@@ -26,7 +26,6 @@ QGCPopupDialog {
 
     property var    _activeVehicle:     QGroundControl.multiVehicleManager.activeVehicle
     property bool   _useChecklist:      QGroundControl.settingsManager.appSettings.useChecklist.rawValue && QGroundControl.corePlugin.options.preFlightChecklistUrl.toString().length
-    property bool   _enforceChecklist:  _useChecklist && QGroundControl.settingsManager.appSettings.enforceChecklist.rawValue
     property bool   _checklistComplete: _activeVehicle && (_activeVehicle.checkListState === Vehicle.CheckListPassed)
 
     on_ActiveVehicleChanged: _showPreFlightChecklistIfNeeded()
@@ -37,7 +36,7 @@ QGCPopupDialog {
     }
 
     function _showPreFlightChecklistIfNeeded() {
-        if (_activeVehicle && !_checklistComplete && _enforceChecklist) {
+        if (_activeVehicle && !_checklistComplete && _useChecklist) {
             popupTimer.restart()
         }
     }

@@ -69,7 +69,7 @@ SettingsPage {
             text:               qsTr("Enforce Preflight Checklist")
             fact:               _enforceChecklist
             enabled:            _settingsManager.appSettings.useChecklist.value
-            visible:            useCheckList.visible && _enforceChecklist.visible
+            visible:            false
             property Fact _enforceChecklist: _settingsManager.appSettings.enforceChecklist
         }
 

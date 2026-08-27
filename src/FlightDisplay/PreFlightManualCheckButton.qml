@@ -37,7 +37,7 @@ PreFlightCheckButton {
 
         QGCLabel {
             Layout.fillWidth:    true
-            text:                root.manualText
+            text:                root.forcePassed ? root._statusText : root.manualText
             font.pointSize:      ScreenTools.smallFontPointSize
             wrapMode:            Text.WordWrap
             horizontalAlignment: Text.AlignLeft

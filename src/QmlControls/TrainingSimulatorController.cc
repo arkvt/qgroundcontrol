@@ -308,7 +308,9 @@ bool TrainingSimulatorController::startPlaneSimulation()
               << QStringLiteral("--sim-address") << QStringLiteral("127.0.0.1")
               << QStringLiteral("-I0")
               << QStringLiteral("--home") << location
-              << QStringLiteral("--serial0") << QStringLiteral("udpclient:127.0.0.1:14550");
+              << QStringLiteral("--serial0") << QStringLiteral("udpclient:127.0.0.1:14550")
+              << QStringLiteral("--serial1") << QStringLiteral("none")
+              << QStringLiteral("--serial2") << QStringLiteral("none");
 
     QProcessEnvironment environment = QProcessEnvironment::systemEnvironment();
     const QString binaryDirectory = QFileInfo(executable).absolutePath();

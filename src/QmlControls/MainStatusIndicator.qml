@@ -16,6 +16,7 @@ import QGroundControl.MultiVehicleManager
 import QGroundControl.ScreenTools
 import QGroundControl.Palette
 import QGroundControl.FactSystem
+import QGroundControl.Vehicle
 
 RowLayout {
     id:         control
@@ -28,6 +29,8 @@ RowLayout {
     property real   _margins:           ScreenTools.defaultFontPixelWidth
     property real   _spacing:           ScreenTools.defaultFontPixelWidth / 2
     property bool   _healthAndArmingChecksSupported: _activeVehicle ? _activeVehicle.healthAndArmingCheckReport.supported : false
+    property bool   _useChecklist:      QGroundControl.settingsManager.appSettings.useChecklist.rawValue && QGroundControl.corePlugin.options.preFlightChecklistUrl.toString().length
+    property bool   _checklistPassed:   !_useChecklist || (_activeVehicle && _activeVehicle.checkListState === Vehicle.CheckListPassed)
 
     function dropMainStatusIndicator() {
         let overallStatusComponent = _activeVehicle ? overallStatusIndicatorPage : overallStatusOfflineIndicatorPage
@@ -98,7 +101,10 @@ RowLayout {
                                 return mainStatusLabel._armedText
                             }
                         } else {
-                            if (_healthAndArmingChecksSupported) {
+                            if (!_checklistPassed) {
+                                _mainStatusBGColor = qgcPal.colorRed
+                                return mainStatusLabel._notReadyToFlyText
+                            } else if (_healthAndArmingChecksSupported) {
                                 if (_activeVehicle.healthAndArmingCheckReport.canArm) {
                                     if (_activeVehicle.healthAndArmingCheckReport.hasWarningsOrErrors) {
                                         _mainStatusBGColor = qgcPal.colorYellow
@@ -203,8 +209,7 @@ RowLayout {
             spacing:    _spacing
 
             QGCButton {
-                // FIXME: forceArm is not possible anymore if _healthAndArmingChecksSupported == true
-                enabled:            _armed || !_healthAndArmingChecksSupported || _activeVehicle.healthAndArmingCheckReport.canArm
+                enabled:            !!_activeVehicle
                 text:               _armed ?  qsTr("Disarm") : (forceArm ? qsTr("Force Arm") : qsTr("Arm"))
                 Layout.alignment:   Qt.AlignLeft
                 glassStyle:         true

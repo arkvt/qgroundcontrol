@@ -14204,6 +14204,31 @@ Click &apos;Ok&apos; to upload the Plan anyway.</source>
       <source>Passed</source>
       <translation>通过</translation>
     </message>
+    <message>
+      <location filename="../src/QmlControls/PreFlightCheckButton.qml" line="59"/>
+      <source>Force passed for this session</source>
+      <translation>本次检查已强制通过</translation>
+    </message>
+    <message>
+      <location filename="../src/QmlControls/PreFlightCheckButton.qml" line="141"/>
+      <source>Cancel Force Pass</source>
+      <translation>取消强制通过</translation>
+    </message>
+    <message>
+      <location filename="../src/QmlControls/PreFlightCheckButton.qml" line="142"/>
+      <source>Restore normal checking for &quot;%1&quot;?</source>
+      <translation>恢复“%1”的正常检查？</translation>
+    </message>
+    <message>
+      <location filename="../src/QmlControls/PreFlightCheckButton.qml" line="147"/>
+      <source>Force Pass This Check</source>
+      <translation>强制通过此项检查</translation>
+    </message>
+    <message>
+      <location filename="../src/QmlControls/PreFlightCheckButton.qml" line="148"/>
+      <source>This bypasses only &quot;%1&quot; for the current checklist session. Other checks remain active. Confirm that the risk has been assessed before continuing.</source>
+      <translation>仅对当前飞前检查会话跳过“%1”。其他检查仍然有效。请确认已评估相关风险后再继续。</translation>
+    </message>
   </context>
   <context>
     <name>PreFlightCheckGroup</name>

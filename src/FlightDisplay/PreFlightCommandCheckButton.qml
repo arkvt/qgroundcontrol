@@ -27,7 +27,9 @@ PreFlightCheckButton {
     readonly property real _sendButtonHeight: Math.max(ScreenTools.minTouchPixels * 0.78, ScreenTools.defaultFontPixelHeight * 1.7)
     readonly property color _commandAcceptedColor: "#4a90e2"
 
-    _color: _telemetryState === _statePassed && _manualState === _statePassed ?
+    _color: forcePassed ?
+                _pendingColor :
+            _telemetryState === _statePassed && _manualState === _statePassed ?
                 _passedColor :
                 (_telemetryState === _stateFailed ?
                      _failedColor :
@@ -82,7 +84,7 @@ PreFlightCheckButton {
 
             QGCLabel {
                 Layout.fillWidth:    true
-                text:                root.manualText
+                text:                root.forcePassed ? root._statusText : root.manualText
                 font.pointSize:      ScreenTools.smallFontPointSize
                 wrapMode:            Text.WordWrap
                 horizontalAlignment: Text.AlignLeft
@@ -131,6 +133,7 @@ PreFlightCheckButton {
     }
 
     function reset() {
+        forcePassed = false
         _manualState = manualText === "" ? _statePassed : _statePending
         if (telemetryFailure) {
             _telemetryState = allowTelemetryFailureOverride ? _statePending : _stateFailed

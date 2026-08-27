@@ -35,6 +35,7 @@
 #include "QGCApplication.h"
 #include "QGCCameraManager.h"
 #include "QGCCorePlugin.h"
+#include "QGCOptions.h"
 #include "QGCImageProvider.h"
 #include "QGCLoggingCategory.h"
 #include "QGCQGeoCoordinate.h"
@@ -1663,6 +1664,22 @@ QGeoCoordinate Vehicle::homePosition()
 
 void Vehicle::setArmed(bool armed, bool showError)
 {
+    if (armed) {
+        AppSettings* appSettings = SettingsManager::instance()->appSettings();
+        const bool enforceChecklist = appSettings->useChecklist()->rawValue().toBool() &&
+                                      !QGCCorePlugin::instance()->options()->preFlightChecklistUrl().isEmpty();
+
+        if (enforceChecklist && _checkListState != CheckListPassed) {
+            qgcApp()->showAppMessage(tr("Pre-flight checklist has not passed. Complete all checks, force-pass only the exceptional item, or use Force Arm when explicitly required."));
+            return;
+        }
+
+        if (_healthAndArmingCheckReport.supported() && !_healthAndArmingCheckReport.canArm()) {
+            qgcApp()->showAppMessage(tr("Vehicle pre-arm checks have not passed. Correct the reported problems or use Force Arm when explicitly required."));
+            return;
+        }
+    }
+
     // We specifically use COMMAND_LONG:MAV_CMD_COMPONENT_ARM_DISARM since it is supported by more flight stacks.
     sendMavCommand(_defaultComponentId,
                    MAV_CMD_COMPONENT_ARM_DISARM,

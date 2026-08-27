@@ -362,7 +362,8 @@ function Test-RuntimePackage {
             '-S', '-w', '--model', 'quadplane', '--speedup', '1', '--sysid', '1', '--slave', '0',
             '--defaults', $defaultsArgument,
             '--sim-address', '127.0.0.1', '-I9', '--home', '31.8511168,117.2292701,50,0',
-            '--serial0', 'udpclient:127.0.0.1:14550'
+            '--serial0', 'udpclient:127.0.0.1:14550',
+            '--serial1', 'none', '--serial2', 'none'
         )
         $process = Start-Process -FilePath $exe -ArgumentList $arguments -WorkingDirectory $testDirectory `
             -RedirectStandardOutput $stdout -RedirectStandardError $stderr -PassThru

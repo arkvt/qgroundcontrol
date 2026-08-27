@@ -44,7 +44,6 @@ Rectangle {
     property real _tileHeight:         Math.max(ScreenTools.minTouchPixels * 1.02, ScreenTools.defaultFontPixelHeight * 3.36)
     property real _contentHeight:      Math.max(1, (_panelMargin * 2) + (_vehicleCount * _tileHeight) + (Math.max(0, _vehicleCount - 1) * _rowSpacing))
     property bool _useChecklist:       QGroundControl.settingsManager.appSettings.useChecklist.rawValue && QGroundControl.corePlugin.options.preFlightChecklistUrl.toString().length
-    property bool _enforceChecklist:   _useChecklist && QGroundControl.settingsManager.appSettings.enforceChecklist.rawValue
 
     signal vehicleClicked(var vehicle)
 
@@ -107,7 +106,7 @@ Rectangle {
         if (!vehicle || !_useChecklist) {
             return true
         }
-        return _enforceChecklist ? vehicle.checkListState === Vehicle.CheckListPassed : true
+        return vehicle.checkListState === Vehicle.CheckListPassed
     }
 
     function canArmVehicle(vehicle) {
@@ -118,7 +117,7 @@ Rectangle {
     }
 
     function showArmForVehicle(vehicle) {
-        return guidedActionsEnabled(vehicle) && vehicle && !vehicle.armed && canArmVehicle(vehicle)
+        return guidedActionsEnabled(vehicle) && vehicle && !vehicle.armed
     }
 
     function showDisarmForVehicle(vehicle) {

@@ -9,6 +9,7 @@
 
 import QtQuick
 import QtQuick.Controls
+import QtQuick.Dialogs
 
 import QGroundControl
 import QGroundControl.Palette
@@ -25,6 +26,8 @@ import QGroundControl.ScreenTools
 ///                 Or it can also optionally be override by the user.
 /// If a button uses both manual and telemetry checks, the telemetry check takes precendence and must be passed first.
 QGCButton {
+    id: root
+
     property string name:                           ""
     property string manualText:                     ""      ///< text to show for a manual check, "" signals no manual check
     property string passedText:                     qsTr("Passed")
@@ -33,14 +36,16 @@ QGCButton {
     property bool   allowTelemetryFailureOverride:  false   ///< true: user can click past telemetry failure
     property bool   preserveTextOnPass:              false   ///< true: keep the check text instead of replacing it with "Passed"
     property bool   descriptionOnNewLine:            false   ///< true: place status/description below the check name
-    property bool   passed:                         _manualState === _statePassed && _telemetryState === _statePassed
-    property bool   failed:                         _manualState === _stateFailed || _telemetryState === _stateFailed
+    property bool   passed:                         forcePassed || (_manualState === _statePassed && _telemetryState === _statePassed)
+    property bool   failed:                         !forcePassed && (_manualState === _stateFailed || _telemetryState === _stateFailed)
+    property bool   forcePassed:                    false   ///< true: operator accepted this check for the current checklist session
 
     property int _manualState:          manualText === "" ? _statePassed : _statePending
     property int _telemetryState:       _statePassed
     property int _horizontalPadding:    ScreenTools.defaultFontPixelWidth
     property int _verticalPadding:      Math.round(ScreenTools.defaultFontPixelHeight / 2)
     property real _stateFlagWidth:      ScreenTools.defaultFontPixelWidth * 4
+    property bool _longPressHandled:    false
 
     readonly property int _statePending:    0   ///< Telemetry check is failing or manual check not yet verified, user can click to make it pass
     readonly property int _stateFailed:     1   ///< Telemetry check is failing, user cannot click to make it pass
@@ -50,14 +55,18 @@ QGCButton {
     readonly property color _pendingColor:  "#f7a81f"
     readonly property color _failedColor:   "#c31818"
 
-    property string _statusText: (_telemetryState !== _statePassed) ?
+    property string _statusText: forcePassed ?
+                                     qsTr("Force passed for this session") :
+                                 (_telemetryState !== _statePassed) ?
                                      telemetryTextFailure :
                                      (_manualState !== _statePassed ?
                                          manualText :
                                          (preserveTextOnPass ? manualText : passedText))
     property string _text:       "<b>" + name + "</b>" +
                                  (_statusText !== "" ? (descriptionOnNewLine ? "<br>" : ": ") + _statusText : "")
-    property color  _color: _telemetryState === _statePassed && _manualState === _statePassed ?
+    property color  _color: forcePassed ?
+                                _pendingColor :
+                            _telemetryState === _statePassed && _manualState === _statePassed ?
                                 _passedColor :
                                 (_telemetryState == _stateFailed ?
                                      _failedColor :
@@ -107,6 +116,10 @@ QGCButton {
     }
 
     function _updateTelemetryState() {
+        if (forcePassed) {
+            _telemetryState = _statePassed
+            return
+        }
         if (telemetryFailure) {
             // We have a new telemetry failure, reset user pass
             _telemetryState = allowTelemetryFailureOverride ? _statePending : _stateFailed
@@ -117,8 +130,34 @@ QGCButton {
 
     onTelemetryFailureChanged:              _updateTelemetryState()
     onAllowTelemetryFailureOverrideChanged: _updateTelemetryState()
+    onForcePassedChanged:                    _updateTelemetryState()
+
+    onPressed: _longPressHandled = false
+
+    onPressAndHold: {
+        _longPressHandled = true
+        if (forcePassed) {
+            mainWindow.showMessageDialog(
+                qsTr("Cancel Force Pass"),
+                qsTr("Restore normal checking for \"%1\"?").arg(name),
+                Dialog.Yes | Dialog.Cancel,
+                function() { root.forcePassed = false })
+        } else if (!passed) {
+            mainWindow.showMessageDialog(
+                qsTr("Force Pass This Check"),
+                qsTr("This bypasses only \"%1\" for the current checklist session. Other checks remain active. Confirm that the risk has been assessed before continuing.").arg(name),
+                Dialog.Yes | Dialog.Cancel,
+                function() { root.forcePassed = true })
+        }
+    }
+
+    onCanceled: _longPressHandled = false
 
     onClicked: {
+        if (_longPressHandled) {
+            _longPressHandled = false
+            return
+        }
         if (telemetryFailure && !allowTelemetryFailureOverride) {
             // No way to proceed past this failure
             return
@@ -144,6 +183,7 @@ QGCButton {
     }
 
     function reset() {
+        forcePassed = false
         _manualState = manualText === "" ? _statePassed : _statePending
         if (telemetryFailure) {
             _telemetryState = allowTelemetryFailureOverride ? _statePending : _stateFailed
