@@ -30,6 +30,9 @@ public:
     qint64 readData(char* data, qint64 maxSize) override;
     bool isSequential() const override { return true; }
 
+signals:
+    void dataReceived(const QByteArray &data);
+
 private slots:
     void _readAvailableData();
 

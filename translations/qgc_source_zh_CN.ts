@@ -9511,6 +9511,51 @@ Click Ok to start the auto-tuning process.
       <translation>NMEA 流 UDP 端口</translation>
     </message>
     <message>
+      <location filename="../src/UI/AppSettings/LinkSettings.qml" line="145"/>
+      <source>Raw GNSS data</source>
+      <translation>GNSS 原始数据</translation>
+    </message>
+    <message>
+      <location filename="../src/UI/AppSettings/LinkSettings.qml" line="146"/>
+      <source>View</source>
+      <translation>查看</translation>
+    </message>
+    <message>
+      <location filename="../src/UI/AppSettings/LinkSettings.qml" line="244"/>
+      <source>GNSS Data</source>
+      <translation>GNSS数据</translation>
+    </message>
+    <message>
+      <location filename="../src/UI/AppSettings/LinkSettings.qml" line="281"/>
+      <source>GNSS source connected</source>
+      <translation>GNSS 数据源已连接</translation>
+    </message>
+    <message>
+      <location filename="../src/UI/AppSettings/LinkSettings.qml" line="282"/>
+      <source>Waiting for GNSS source</source>
+      <translation>正在等待 GNSS 数据源</translation>
+    </message>
+    <message>
+      <location filename="../src/UI/AppSettings/LinkSettings.qml" line="286"/>
+      <source>Resume</source>
+      <translation>继续</translation>
+    </message>
+    <message>
+      <location filename="../src/UI/AppSettings/LinkSettings.qml" line="286"/>
+      <source>Pause</source>
+      <translation>暂停</translation>
+    </message>
+    <message>
+      <location filename="../src/UI/AppSettings/LinkSettings.qml" line="296"/>
+      <source>Clear</source>
+      <translation>清空</translation>
+    </message>
+    <message>
+      <location filename="../src/UI/AppSettings/LinkSettings.qml" line="316"/>
+      <source>Waiting for GNSS data</source>
+      <translation>正在等待 GNSS 数据</translation>
+    </message>
+    <message>
       <location filename="../src/UI/AppSettings/LinkSettings.qml" line="114"/>
       <source>Links</source>
       <translation>链路</translation>

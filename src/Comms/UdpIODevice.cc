@@ -57,8 +57,14 @@ void UdpIODevice::_readAvailableData()
 {
     while (hasPendingDatagrams()) {
         const qint64 size = pendingDatagramSize();
-        const int oldSize = _buffer.size();
-        _buffer.resize(oldSize + static_cast<int>(size));
-        (void) readDatagram(_buffer.data() + oldSize, size);
+        QByteArray datagram(static_cast<qsizetype>(size), Qt::Uninitialized);
+        const qint64 bytesRead = readDatagram(datagram.data(), size);
+        if (bytesRead <= 0) {
+            continue;
+        }
+
+        datagram.resize(static_cast<qsizetype>(bytesRead));
+        _buffer.append(datagram);
+        emit dataReceived(datagram);
     }
 }

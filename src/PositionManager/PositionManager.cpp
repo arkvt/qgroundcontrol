@@ -21,6 +21,11 @@
 #include <QtPositioning/QNmeaPositionInfoSource>
 #include <QtQml/qqml.h>
 
+namespace {
+constexpr int kMaxNmeaRawDataBytes = 128 * 1024;
+
+} // namespace
+
 QGC_LOGGING_CATEGORY(QGCPositionManagerLog, "qgc.positionmanager.positionmanager")
 
 Q_APPLICATION_STATIC(QGCPositionManager, _positionManager);
@@ -29,6 +34,10 @@ QGCPositionManager::QGCPositionManager(QObject *parent)
     : QObject(parent)
 {
     // qCDebug(QGCPositionManagerLog) << Q_FUNC_INFO << this;
+
+    _nmeaRawDataNotifyTimer.setSingleShot(true);
+    _nmeaRawDataNotifyTimer.setInterval(100);
+    (void) connect(&_nmeaRawDataNotifyTimer, &QTimer::timeout, this, &QGCPositionManager::nmeaRawDataChanged);
 }
 
 QGCPositionManager::~QGCPositionManager()
@@ -100,6 +109,9 @@ void QGCPositionManager::_checkPermission()
 
 void QGCPositionManager::setNmeaSourceDevice(QIODevice *device)
 {
+    (void) disconnect(_nmeaDeviceCloseConnection);
+    (void) disconnect(_nmeaDeviceDestroyedConnection);
+
     if (_nmeaSource) {
         _nmeaSource->stopUpdates();
         (void) disconnect(_nmeaSource);
@@ -112,10 +124,68 @@ void QGCPositionManager::setNmeaSourceDevice(QIODevice *device)
         _nmeaSource = nullptr;
     }
 
+    _nmeaSourceDevice = device;
+
+    clearNmeaRawData();
+
+    if (!device) {
+        _setNmeaSourceActive(false);
+        return;
+    }
+
+    _nmeaDeviceCloseConnection = connect(device, &QIODevice::aboutToClose, this, [this, device]() {
+        if (_nmeaSourceDevice == device) {
+            _setNmeaSourceActive(false);
+        }
+    });
+    _nmeaDeviceDestroyedConnection = connect(device, &QObject::destroyed, this, [this]() {
+        _nmeaSourceDevice = nullptr;
+        _setNmeaSourceActive(false);
+    });
+
     _nmeaSource = new QNmeaPositionInfoSource(QNmeaPositionInfoSource::RealTimeMode, this);
     _nmeaSource->setDevice(device);
     _nmeaSource->setUserEquivalentRangeError(5.1);
     _setPositionSource(QGCPositionManager::NmeaGPS);
+    _setNmeaSourceActive(device->isOpen());
+}
+
+void QGCPositionManager::clearNmeaRawData()
+{
+    if (_nmeaRawData.isEmpty()) {
+        return;
+    }
+
+    _nmeaRawData.clear();
+    _nmeaRawDataNotifyTimer.stop();
+    emit nmeaRawDataChanged();
+}
+
+void QGCPositionManager::appendNmeaRawData(const QByteArray &data)
+{
+    if (data.size() >= kMaxNmeaRawDataBytes) {
+        _nmeaRawData = data.right(kMaxNmeaRawDataBytes);
+    } else {
+        _nmeaRawData.append(data);
+        const qsizetype excessBytes = _nmeaRawData.size() - kMaxNmeaRawDataBytes;
+        if (excessBytes > 0) {
+            _nmeaRawData.remove(0, excessBytes);
+        }
+    }
+
+    if (!_nmeaRawDataNotifyTimer.isActive()) {
+        _nmeaRawDataNotifyTimer.start();
+    }
+}
+
+void QGCPositionManager::_setNmeaSourceActive(bool active)
+{
+    if (_nmeaSourceActive == active) {
+        return;
+    }
+
+    _nmeaSourceActive = active;
+    emit nmeaSourceActiveChanged();
 }
 
 void QGCPositionManager::_positionUpdated(const QGeoPositionInfo &update)

@@ -140,6 +140,12 @@ SettingsPage {
             label: qsTr("NMEA stream UDP port")
             fact: QGroundControl.settingsManager.autoConnectSettings.nmeaUdpPort
         }
+
+        LabelledButton {
+            label:      qsTr("Raw GNSS data")
+            buttonText: qsTr("View")
+            onClicked:  gnssDataDialogComponent.createObject(mainWindow).open()
+        }
     }
 
     SettingsGroupLayout {
@@ -226,6 +232,89 @@ SettingsPage {
             onClicked: {
                 var editingConfig = _linkManager.createConfiguration(ScreenTools.isSerialAvailable ? LinkConfiguration.TypeSerial : LinkConfiguration.TypeUdp, "")
                 linkDialogComponent.createObject(mainWindow, { editingConfig: editingConfig, originalConfig: null }).open()
+            }
+        }
+    }
+
+    Component {
+        id: gnssDataDialogComponent
+
+        QGCPopupDialog {
+            id:      gnssDataDialog
+            title:   qsTr("GNSS Data")
+            buttons: Dialog.Close
+
+            property var _positionManager: QGroundControl.qgcPositionManger
+            property bool _paused: false
+            property string _displayedData: _positionManager.nmeaRawData
+
+            function updateDisplayedData() {
+                if (!_paused) {
+                    _displayedData = _positionManager.nmeaRawData
+                    Qt.callLater(function() {
+                        gnssDataText.cursorPosition = gnssDataText.length
+                    })
+                }
+            }
+
+            Connections {
+                target: gnssDataDialog._positionManager
+
+                function onNmeaRawDataChanged() {
+                    gnssDataDialog.updateDisplayedData()
+                }
+            }
+
+            ColumnLayout {
+                spacing: ScreenTools.defaultFontPixelHeight / 2
+
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: ScreenTools.defaultFontPixelWidth
+
+                    QGCLabel {
+                        Layout.fillWidth: true
+                        text: gnssDataDialog._positionManager.nmeaSourceActive
+                              ? qsTr("GNSS source connected")
+                              : qsTr("Waiting for GNSS source")
+                    }
+
+                    QGCButton {
+                        text:       gnssDataDialog._paused ? qsTr("Resume") : qsTr("Pause")
+                        iconSource: gnssDataDialog._paused ? "/res/Play.svg" : "/res/Pause.svg"
+                        onClicked: {
+                            gnssDataDialog._paused = !gnssDataDialog._paused
+                            gnssDataDialog.updateDisplayedData()
+                        }
+                    }
+
+                    QGCButton {
+                        text:       qsTr("Clear")
+                        iconSource: "/res/TrashDelete.svg"
+                        enabled:    gnssDataDialog._displayedData.length > 0 || gnssDataDialog._positionManager.nmeaRawData.length > 0
+                        onClicked: {
+                            gnssDataDialog._positionManager.clearNmeaRawData()
+                            gnssDataDialog._displayedData = ""
+                        }
+                    }
+                }
+
+                ScrollView {
+                    Layout.preferredWidth:  Math.min(mainWindow.width * 0.8, ScreenTools.defaultFontPixelWidth * 100)
+                    Layout.preferredHeight: Math.min(mainWindow.height * 0.65, ScreenTools.defaultFontPixelHeight * 28)
+                    clip: true
+
+                    TextArea {
+                        id: gnssDataText
+                        text: gnssDataDialog._displayedData
+                        placeholderText: qsTr("Waiting for GNSS data")
+                        readOnly: true
+                        selectByMouse: true
+                        wrapMode: TextEdit.WrapAnywhere
+                        font.family: ScreenTools.fixedFontFamily
+                        color: QGroundControl.globalPalette.text
+                    }
+                }
             }
         }
     }

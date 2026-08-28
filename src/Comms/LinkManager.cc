@@ -58,6 +58,33 @@ QGC_LOGGING_CATEGORY(LinkManagerVerboseLog, "qgc.comms.linkmanager:verbose")
 
 Q_APPLICATION_STATIC(LinkManager, _linkManagerInstance);
 
+#ifndef QGC_NO_SERIAL_LINK
+namespace {
+
+class NmeaSerialPort : public QSerialPort
+{
+public:
+    NmeaSerialPort(const QSerialPortInfo &portInfo, QObject *parent)
+        : QSerialPort(portInfo, parent)
+    {
+        (void) connect(this, &QSerialPort::readyRead, this, [this]() {
+            const QByteArray pendingData = peek(bytesAvailable());
+            if (pendingData.size() > _capturedPendingBytes) {
+                QGCPositionManager::instance()->appendNmeaRawData(pendingData.sliced(_capturedPendingBytes));
+            }
+        });
+        (void) connect(this, &QSerialPort::readyRead, this, [this]() {
+            _capturedPendingBytes = bytesAvailable();
+        }, Qt::QueuedConnection);
+    }
+
+private:
+    qsizetype _capturedPendingBytes = 0;
+};
+
+} // namespace
+#endif
+
 LinkManager::LinkManager(QObject *parent)
     : QObject(parent)
     , _portListTimer(new QTimer(this))
@@ -67,6 +94,10 @@ LinkManager::LinkManager(QObject *parent)
 #endif
 {
     // qCDebug(LinkManagerLog) << Q_FUNC_INFO << this;
+#ifndef QGC_NO_SERIAL_LINK
+    (void) connect(_nmeaSocket, &UdpIODevice::dataReceived,
+                   QGCPositionManager::instance(), &QGCPositionManager::appendNmeaRawData);
+#endif
 }
 
 LinkManager::~LinkManager()
@@ -849,7 +880,7 @@ void LinkManager::_addSerialAutoConnectLink()
             if (portInfo.systemLocation().trimmed() != _nmeaDeviceName) {
                 _nmeaDeviceName = portInfo.systemLocation().trimmed();
                 qCDebug(LinkManagerLog) << "Configuring nmea port" << _nmeaDeviceName;
-                QSerialPort* newPort = new QSerialPort(portInfo, this);
+                QSerialPort* newPort = new NmeaSerialPort(portInfo, this);
                 _nmeaBaud = _autoConnectSettings->autoConnectNmeaBaud()->cookedValue().toUInt();
                 newPort->setBaudRate(static_cast<qint32>(_nmeaBaud));
                 newPort->setDataBits(QSerialPort::Data8);

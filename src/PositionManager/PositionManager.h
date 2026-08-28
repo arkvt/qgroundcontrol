@@ -9,8 +9,12 @@
 
 #pragma once
 
+#include <QtCore/QByteArray>
+#include <QtCore/QIODevice>
 #include <QtCore/QLoggingCategory>
 #include <QtCore/QObject>
+#include <QtCore/QPointer>
+#include <QtCore/QTimer>
 #include <QtPositioning/QGeoCoordinate>
 #include <QtPositioning/QGeoPositionInfo>
 #include <QtQmlIntegration/QtQmlIntegration>
@@ -31,6 +35,8 @@ class QGCPositionManager : public QObject
     Q_PROPERTY(qreal          gcsAltitude                   READ gcsAltitude                    NOTIFY gcsAltitudeChanged)
     Q_PROPERTY(qreal          gcsHeading                    READ gcsHeading                     NOTIFY gcsHeadingChanged)
     Q_PROPERTY(qreal          gcsPositionHorizontalAccuracy READ gcsPositionHorizontalAccuracy  NOTIFY gcsPositionHorizontalAccuracyChanged)
+    Q_PROPERTY(QString        nmeaRawData                   READ nmeaRawData                    NOTIFY nmeaRawDataChanged)
+    Q_PROPERTY(bool           nmeaSourceActive              READ nmeaSourceActive               NOTIFY nmeaSourceActiveChanged)
 
 public:
     QGCPositionManager(QObject *parent = nullptr);
@@ -48,8 +54,12 @@ public:
     qreal gcsPositionHorizontalAccuracy() const { return _gcsPositionHorizontalAccuracy; }
     QGeoPositionInfo geoPositionInfo() const { return _geoPositionInfo; }
     int updateInterval() const { return _updateInterval; }
+    QString nmeaRawData() const { return QString::fromLatin1(_nmeaRawData); }
+    bool nmeaSourceActive() const { return _nmeaSourceActive; }
 
     void setNmeaSourceDevice(QIODevice *device);
+    void appendNmeaRawData(const QByteArray &data);
+    Q_INVOKABLE void clearNmeaRawData();
 
 signals:
     void gcsPositionChanged(QGeoCoordinate gcsPosition);
@@ -57,6 +67,8 @@ signals:
     void gcsHeadingChanged(qreal gcsHeading);
     void positionInfoUpdated(QGeoPositionInfo update);
     void gcsPositionHorizontalAccuracyChanged(qreal gcsPositionHorizontalAccuracy);
+    void nmeaRawDataChanged();
+    void nmeaSourceActiveChanged();
 
 private slots:
     void _positionUpdated(const QGeoPositionInfo &update);
@@ -77,6 +89,7 @@ private:
     void _setGCSHeading(qreal newGCSHeading);
     void _setGCSPosition(const QGeoCoordinate &newGCSPosition);
     void _setGCSAltitude(qreal newGCSAltitude);
+    void _setNmeaSourceActive(bool active);
 
     bool _usingPluginSource = false;
     int _updateInterval = 0;
@@ -93,7 +106,15 @@ private:
     QGeoPositionInfoSource *_currentSource = nullptr;
     QGeoPositionInfoSource *_defaultSource = nullptr;
     QNmeaPositionInfoSource *_nmeaSource = nullptr;
+    QPointer<QIODevice> _nmeaSourceDevice;
     QGeoPositionInfoSource *_simulatedSource = nullptr;
+
+    QByteArray _nmeaRawData;
+    QTimer _nmeaRawDataNotifyTimer;
+    bool _nmeaSourceActive = false;
+
+    QMetaObject::Connection _nmeaDeviceCloseConnection;
+    QMetaObject::Connection _nmeaDeviceDestroyedConnection;
 
     QGCCompass *_compass = nullptr;
 
