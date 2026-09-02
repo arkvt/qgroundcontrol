@@ -20,6 +20,7 @@
 #include "AutoConnectSettings.h"
 #include "TCPLink.h"
 #include "UDPLink.h"
+#include "Vehicle.h"
 
 #ifdef QGC_ENABLE_BLUETOOTH
 #include "BluetoothLink.h"
@@ -61,6 +62,26 @@ Q_APPLICATION_STATIC(LinkManager, _linkManagerInstance);
 #ifndef QGC_NO_SERIAL_LINK
 namespace {
 
+QString normalizedSerialPortName(QString portName)
+{
+    portName = portName.trimmed();
+#ifdef Q_OS_WIN
+    portName.replace('/', '\\');
+    if (portName.startsWith(QStringLiteral("\\\\.\\")) || portName.startsWith(QStringLiteral("\\\\?\\"))) {
+        portName.remove(0, 4);
+    }
+    return portName.toUpper();
+#else
+    return portName;
+#endif
+}
+
+bool serialPortNamesMatch(const QString &first, const QString &second)
+{
+    const QString normalizedFirst = normalizedSerialPortName(first);
+    return !normalizedFirst.isEmpty() && (normalizedFirst == normalizedSerialPortName(second));
+}
+
 class NmeaSerialPort : public QSerialPort
 {
 public:
@@ -69,17 +90,20 @@ public:
     {
         (void) connect(this, &QSerialPort::readyRead, this, [this]() {
             const QByteArray pendingData = peek(bytesAvailable());
-            if (pendingData.size() > _capturedPendingBytes) {
-                QGCPositionManager::instance()->appendNmeaRawData(pendingData.sliced(_capturedPendingBytes));
+            const qsizetype alreadyCaptured = pendingData.startsWith(_capturedPendingData)
+                ? _capturedPendingData.size()
+                : 0;
+            if (pendingData.size() > alreadyCaptured) {
+                QGCPositionManager::instance()->appendNmeaRawData(pendingData.sliced(alreadyCaptured));
             }
         });
         (void) connect(this, &QSerialPort::readyRead, this, [this]() {
-            _capturedPendingBytes = bytesAvailable();
+            _capturedPendingData = peek(bytesAvailable());
         }, Qt::QueuedConnection);
     }
 
 private:
-    qsizetype _capturedPendingBytes = 0;
+    QByteArray _capturedPendingData;
 };
 
 } // namespace
@@ -131,6 +155,20 @@ void LinkManager::init()
 {
     _autoConnectSettings = SettingsManager::instance()->autoConnectSettings();
 
+#ifndef QGC_NO_SERIAL_LINK
+    // Selecting or editing a GNSS source only stores its configuration. A connection
+    // is created exclusively by connectNmeaSource(), following an explicit user action.
+    const auto disconnectNmeaOnConfigurationChange = [this](const QVariant &) {
+        disconnectNmeaSource();
+    };
+    (void) connect(_autoConnectSettings->autoConnectNmeaPort(), &Fact::rawValueChanged,
+                   this, disconnectNmeaOnConfigurationChange);
+    (void) connect(_autoConnectSettings->autoConnectNmeaBaud(), &Fact::rawValueChanged,
+                   this, disconnectNmeaOnConfigurationChange);
+    (void) connect(_autoConnectSettings->nmeaUdpPort(), &Fact::rawValueChanged,
+                   this, disconnectNmeaOnConfigurationChange);
+#endif
+
     if (!qgcApp()->runningUnitTests()) {
         (void) connect(_portListTimer, &QTimer::timeout, this, &LinkManager::_updateAutoConnectLinks);
         _portListTimer->start(_autoconnectUpdateTimerMSecs); // timeout must be long enough to get past bootloader on second pass
@@ -144,6 +182,17 @@ QmlObjectListModel *LinkManager::_qmlLinkConfigurations()
 
 void LinkManager::createConnectedLink(const LinkConfiguration *config)
 {
+#ifndef QGC_NO_SERIAL_LINK
+    const SerialConfiguration* const serialConfig = qobject_cast<const SerialConfiguration*>(config);
+    if (serialConfig && _serialPortReservedForNmea(serialConfig->portName())) {
+        qgcApp()->showAppMessage(
+            tr("Serial port %1 is reserved for the GNSS source. Select a different GNSS device or disable it before creating a MAVLink connection.")
+                .arg(serialConfig->portName()),
+            tr("Serial Port Reserved"));
+        return;
+    }
+#endif
+
     for (SharedLinkConfigurationPtr &sharedConfig : _rgLinkConfigs) {
         if (sharedConfig.get() == config) {
             createConnectedLink(sharedConfig);
@@ -154,6 +203,15 @@ void LinkManager::createConnectedLink(const LinkConfiguration *config)
 bool LinkManager::createConnectedLink(SharedLinkConfigurationPtr &config)
 {
     SharedLinkInterfacePtr link = nullptr;
+
+#ifndef QGC_NO_SERIAL_LINK
+    const SerialConfiguration* const serialConfig = qobject_cast<const SerialConfiguration*>(config.get());
+    if (serialConfig && _serialPortReservedForNmea(serialConfig->portName())) {
+        qCWarning(LinkManagerLog) << "Skipping MAVLink connection on GNSS-reserved serial port"
+                                  << serialConfig->portName();
+        return false;
+    }
+#endif
 
     switch(config->type()) {
 #ifndef QGC_NO_SERIAL_LINK
@@ -265,6 +323,16 @@ void LinkManager::_linkDisconnected()
         return;
     }
 
+#ifndef QGC_NO_SERIAL_LINK
+    bool retryNmeaConnection = false;
+    const SharedLinkConfigurationPtr disconnectedConfig = link->linkConfiguration();
+    const SerialConfiguration* const disconnectedSerialConfig = qobject_cast<const SerialConfiguration*>(disconnectedConfig.get());
+    if (disconnectedSerialConfig && _nmeaConnectionRequested
+        && _serialPortReservedForNmea(disconnectedSerialConfig->portName())) {
+        retryNmeaConnection = true;
+    }
+#endif
+
     (void) disconnect(link, &LinkInterface::communicationError, qgcApp(), &QGCApplication::showAppMessage);
     (void) disconnect(link, &LinkInterface::bytesReceived, MAVLinkProtocol::instance(), &MAVLinkProtocol::receiveBytes);
     (void) disconnect(link, &LinkInterface::bytesSent, MAVLinkProtocol::instance(), &MAVLinkProtocol::logSentBytes);
@@ -276,6 +344,15 @@ void LinkManager::_linkDisconnected()
         if (it->get() == link) {
             qCDebug(LinkManagerLog) << Q_FUNC_INFO << it->get()->linkConfiguration()->name() << it->use_count();
             (void) _rgLinks.erase(it);
+#ifndef QGC_NO_SERIAL_LINK
+            if (retryNmeaConnection) {
+                QTimer::singleShot(0, this, [this]() {
+                    if (_nmeaConnectionRequested) {
+                        _addSerialAutoConnectLink();
+                    }
+                });
+            }
+#endif
             return;
         }
     }
@@ -539,34 +616,135 @@ void LinkManager::_updateAutoConnectLinks()
     _addZeroConfAutoConnectLink();
 #endif
 
-    // check to see if nmea gps is configured for UDP input, if so, set it up to connect
-    if (_autoConnectSettings->autoConnectNmeaPort()->cookedValueString() == "UDP Port") {
-        if ((_nmeaSocket->localPort() != _autoConnectSettings->nmeaUdpPort()->rawValue().toUInt()) || (_nmeaSocket->state() != UdpIODevice::BoundState)) {
-            qCDebug(LinkManagerLog) << "Changing port for UDP NMEA stream";
-            _nmeaSocket->close();
-            _nmeaSocket->bind(QHostAddress::AnyIPv4, _autoConnectSettings->nmeaUdpPort()->rawValue().toUInt());
-            QGCPositionManager::instance()->setNmeaSourceDevice(_nmeaSocket);
-        }
-#ifndef QGC_NO_SERIAL_LINK
-        if (_nmeaPort) {
-            _nmeaPort->close();
-            delete _nmeaPort;
-            _nmeaPort = nullptr;
-            _nmeaDeviceName = "";
-        }
-#endif
-    } else {
-        _nmeaSocket->close();
-    }
+    _updateNmeaConnection();
 
 #ifndef QGC_NO_SERIAL_LINK
     _addSerialAutoConnectLink();
 #endif
 }
 
+void LinkManager::connectNmeaSource()
+{
+    _setNmeaConnectionRequested(true);
+    _setNmeaConnectionError(QString());
+    _updateNmeaConnection();
+#ifndef QGC_NO_SERIAL_LINK
+    if (_nmeaConnectionRequested
+        && _autoConnectSettings->autoConnectNmeaPort()->cookedValueString() != QStringLiteral("UDP Port")) {
+        _addSerialAutoConnectLink();
+    }
+#endif
+}
+
+void LinkManager::disconnectNmeaSource()
+{
+    _setNmeaConnectionRequested(false);
+    _setNmeaConnectionError(QString());
+    _closeNmeaConnection();
+}
+
+void LinkManager::_setNmeaConnectionRequested(bool requested)
+{
+    if (_nmeaConnectionRequested == requested) {
+        return;
+    }
+    _nmeaConnectionRequested = requested;
+    emit nmeaConnectionRequestedChanged();
+}
+
+void LinkManager::_setNmeaConnectionError(const QString &error)
+{
+    if (_nmeaConnectionError == error) {
+        return;
+    }
+    _nmeaConnectionError = error;
+    emit nmeaConnectionErrorChanged();
+}
+
+void LinkManager::_failNmeaConnection(const QString &error)
+{
+    _closeNmeaConnection();
+    _setNmeaConnectionError(error);
+}
+
+void LinkManager::_closeNmeaConnection()
+{
+#ifndef QGC_NO_SERIAL_LINK
+    const bool hadConnection = _nmeaSocket->isOpen() || _nmeaPort || QGCPositionManager::instance()->nmeaSourceActive();
+    if (hadConnection) {
+        QGCPositionManager::instance()->setNmeaSourceDevice(nullptr);
+    }
+    _nmeaSocket->close();
+    if (_nmeaPort) {
+        if (_nmeaPort->isOpen()) {
+            (void) _nmeaPort->clear(QSerialPort::Input);
+        }
+        _nmeaPort->close();
+        delete _nmeaPort;
+        _nmeaPort = nullptr;
+    }
+    _nmeaDeviceName.clear();
+#endif
+}
+
+void LinkManager::_updateNmeaConnection()
+{
+#ifndef QGC_NO_SERIAL_LINK
+    if (!_nmeaConnectionRequested) {
+        _closeNmeaConnection();
+        return;
+    }
+
+    const QString selectedDevice = _autoConnectSettings->autoConnectNmeaPort()->cookedValueString();
+    if (selectedDevice.isEmpty() || selectedDevice == QStringLiteral("Disabled")) {
+        _setNmeaConnectionRequested(false);
+        _failNmeaConnection(tr("Select a GNSS device before connecting."));
+        return;
+    }
+
+    if (selectedDevice == QStringLiteral("UDP Port")) {
+        if (_nmeaPort) {
+            QGCPositionManager::instance()->setNmeaSourceDevice(nullptr);
+            _nmeaPort->close();
+            delete _nmeaPort;
+            _nmeaPort = nullptr;
+            _nmeaDeviceName.clear();
+        }
+
+        const quint16 port = static_cast<quint16>(_autoConnectSettings->nmeaUdpPort()->rawValue().toUInt());
+        if ((_nmeaSocket->localPort() != port) || (_nmeaSocket->state() != UdpIODevice::BoundState)) {
+            _nmeaSocket->close();
+            if (!_nmeaSocket->bind(QHostAddress::AnyIPv4, port)) {
+                _failNmeaConnection(tr("Unable to open GNSS UDP port %1: %2").arg(port).arg(_nmeaSocket->errorString()));
+                return;
+            }
+            QGCPositionManager::instance()->setNmeaSourceDevice(_nmeaSocket);
+        }
+        _setNmeaConnectionError(QString());
+        return;
+    }
+
+    if (_nmeaSocket->isOpen()) {
+        QGCPositionManager::instance()->setNmeaSourceDevice(nullptr);
+        _nmeaSocket->close();
+    }
+    if (_nmeaPort && !serialPortNamesMatch(_nmeaDeviceName, selectedDevice)) {
+        QGCPositionManager::instance()->setNmeaSourceDevice(nullptr);
+        _nmeaPort->close();
+        delete _nmeaPort;
+        _nmeaPort = nullptr;
+        _nmeaDeviceName.clear();
+    }
+#else
+    _setNmeaConnectionRequested(false);
+    _failNmeaConnection(tr("GNSS serial connections are not supported in this build."));
+#endif
+}
+
 void LinkManager::shutdown()
 {
     setConnectionsSuspended(tr("Shutdown"));
+    disconnectNmeaSource();
     disconnectAll();
 
     // Wait for all the vehicles to go away to ensure an orderly shutdown and deletion of all objects
@@ -860,6 +1038,8 @@ void LinkManager::_addSerialAutoConnectLink()
     _filterCompositePorts(portList);
 
     QStringList currentPorts;
+    const QString selectedNmeaDevice = _autoConnectSettings->autoConnectNmeaPort()->cookedValueString().trimmed();
+    bool selectedNmeaDeviceFound = false;
     for (const QGCSerialPortInfo &portInfo: portList) {
         qCDebug(LinkManagerVerboseLog) << "-----------------------------------------------------";
         qCDebug(LinkManagerVerboseLog) << "portName:          " << portInfo.portName();
@@ -876,31 +1056,121 @@ void LinkManager::_addSerialAutoConnectLink()
         QString boardName;
 
         // check to see if nmea gps is configured for current Serial port, if so, set it up to connect
-        if (portInfo.systemLocation().trimmed() == _autoConnectSettings->autoConnectNmeaPort()->cookedValueString()) {
-            if (portInfo.systemLocation().trimmed() != _nmeaDeviceName) {
-                _nmeaDeviceName = portInfo.systemLocation().trimmed();
-                qCDebug(LinkManagerLog) << "Configuring nmea port" << _nmeaDeviceName;
+        if (serialPortNamesMatch(portInfo.systemLocation(), selectedNmeaDevice)) {
+            selectedNmeaDeviceFound = true;
+            if (!_nmeaConnectionRequested) {
+                continue;
+            }
+
+            // A device selected as the GCS NMEA source must have a single serial owner. RTK
+            // auto-connect is safe to release; an active MAVLink link requires user action.
+            if (serialPortNamesMatch(_autoConnectRTKPort, selectedNmeaDevice)) {
+                qCInfo(LinkManagerLog) << "Releasing RTK auto-connect for GNSS source" << selectedNmeaDevice;
+                if (!GPSManager::instance()->gpsRtk()->disconnectGPS()) {
+                    _setNmeaConnectionError(tr("Waiting for RTK device %1 to release.").arg(selectedNmeaDevice));
+                    continue;
+                }
+                _autoConnectRTKPort.clear();
+            }
+            const SharedLinkInterfacePtr serialOwner = _serialLinkForPort(selectedNmeaDevice);
+            if (serialOwner) {
+                const SharedLinkConfigurationPtr ownerConfig = serialOwner->linkConfiguration();
+                const QString ownerName = ownerConfig ? ownerConfig->name() : tr("Unknown");
+                if (_linkUsedByVehicle(serialOwner.get())) {
+                    _failNmeaConnection(tr("GNSS device %1 is being used by active vehicle connection %2.")
+                                            .arg(selectedNmeaDevice, ownerName));
+                    continue;
+                }
+                if (ownerConfig && ownerConfig->isDynamic()) {
+                    _failNmeaConnection(tr("GNSS device %1 is being used by automatic connection %2.")
+                                            .arg(selectedNmeaDevice, ownerName));
+                    continue;
+                }
+
+                qCInfo(LinkManagerLog) << "Releasing inactive serial connection for GNSS source"
+                                       << ownerName << selectedNmeaDevice;
+                _setNmeaConnectionError(tr("Waiting for serial connection %1 to release GNSS device %2.")
+                                            .arg(ownerName, selectedNmeaDevice));
+                serialOwner->disconnect();
+                continue;
+            }
+
+            if (!_nmeaPort || !_nmeaPort->isOpen() || !serialPortNamesMatch(portInfo.systemLocation(), _nmeaDeviceName)) {
+                qCDebug(LinkManagerLog) << "Configuring nmea port" << selectedNmeaDevice;
                 QSerialPort* newPort = new NmeaSerialPort(portInfo, this);
-                _nmeaBaud = _autoConnectSettings->autoConnectNmeaBaud()->cookedValue().toUInt();
-                newPort->setBaudRate(static_cast<qint32>(_nmeaBaud));
+                const qint32 requestedBaud = _autoConnectSettings->autoConnectNmeaBaud()->cookedValue().toInt();
+                (void) newPort->setBaudRate(requestedBaud);
                 newPort->setDataBits(QSerialPort::Data8);
                 newPort->setParity(QSerialPort::NoParity);
                 newPort->setStopBits(QSerialPort::OneStop);
                 newPort->setFlowControl(QSerialPort::NoFlowControl);
-                qCDebug(LinkManagerLog) << "Configuring nmea baudrate" << _nmeaBaud;
+                qCDebug(LinkManagerLog) << "Configuring nmea baudrate" << requestedBaud;
                 if (!newPort->open(QIODevice::ReadOnly)) {
-                    qCWarning(LinkManagerLog) << "Failed to open nmea port" << _nmeaDeviceName << newPort->errorString();
+                    const QString error = tr("Unable to open GNSS device %1: %2").arg(selectedNmeaDevice, newPort->errorString());
+                    qCWarning(LinkManagerLog) << error;
+                    delete newPort;
+                    _failNmeaConnection(error);
+                    continue;
                 }
+                if (!newPort->setBaudRate(requestedBaud)) {
+                    const QString error = tr("Unable to set GNSS baudrate on %1: %2").arg(selectedNmeaDevice, newPort->errorString());
+                    qCWarning(LinkManagerLog) << error;
+                    newPort->close();
+                    delete newPort;
+                    _failNmeaConnection(error);
+                    continue;
+                }
+                if (newPort->baudRate() != requestedBaud) {
+                    const QString error = tr("GNSS device %1 opened at %2 baud instead of requested %3.")
+                                              .arg(selectedNmeaDevice)
+                                              .arg(newPort->baudRate())
+                                              .arg(requestedBaud);
+                    qCWarning(LinkManagerLog) << error;
+                    newPort->close();
+                    delete newPort;
+                    _failNmeaConnection(error);
+                    continue;
+                }
+                _nmeaBaud = static_cast<uint32_t>(requestedBaud);
+                qCInfo(LinkManagerLog) << "Opened GNSS device" << selectedNmeaDevice << "at baudrate" << newPort->baudRate();
                 // This will stop polling old device if previously set
                 QGCPositionManager::instance()->setNmeaSourceDevice(newPort);
                 if (_nmeaPort) {
                     delete _nmeaPort;
                 }
                 _nmeaPort = newPort;
+                _nmeaDeviceName = selectedNmeaDevice;
+                (void) connect(_nmeaPort, &QSerialPort::errorOccurred, this,
+                               [this, newPort, selectedNmeaDevice](QSerialPort::SerialPortError error) {
+                    if (error != QSerialPort::ResourceError && error != QSerialPort::DeviceNotFoundError) {
+                        return;
+                    }
+                    QTimer::singleShot(0, this, [this, newPort, selectedNmeaDevice]() {
+                        if (_nmeaPort != newPort) {
+                            return;
+                        }
+                        // A removed USB device ends the explicit connection session. If the
+                        // device is plugged in again, the user must reconnect it manually.
+                        _setNmeaConnectionRequested(false);
+                        _failNmeaConnection(tr("GNSS device is not available: %1").arg(selectedNmeaDevice));
+                    });
+                });
+                _setNmeaConnectionError(QString());
             } else if (_autoConnectSettings->autoConnectNmeaBaud()->cookedValue().toUInt() != _nmeaBaud) {
-                _nmeaBaud = _autoConnectSettings->autoConnectNmeaBaud()->cookedValue().toUInt();
-                _nmeaPort->setBaudRate(static_cast<qint32>(_nmeaBaud));
-                qCDebug(LinkManagerLog) << "Configuring nmea baudrate" << _nmeaBaud;
+                const qint32 requestedBaud = _autoConnectSettings->autoConnectNmeaBaud()->cookedValue().toInt();
+                if (!_nmeaPort->setBaudRate(requestedBaud)) {
+                    _failNmeaConnection(tr("Unable to set GNSS baudrate on %1: %2").arg(selectedNmeaDevice, _nmeaPort->errorString()));
+                    continue;
+                }
+                if (_nmeaPort->baudRate() != requestedBaud) {
+                    _failNmeaConnection(tr("GNSS device %1 opened at %2 baud instead of requested %3.")
+                                            .arg(selectedNmeaDevice)
+                                            .arg(_nmeaPort->baudRate())
+                                            .arg(requestedBaud));
+                    continue;
+                }
+                _nmeaBaud = static_cast<uint32_t>(requestedBaud);
+                qCInfo(LinkManagerLog) << "Updated GNSS device" << selectedNmeaDevice << "to baudrate" << _nmeaPort->baudRate();
             }
         } else if (portInfo.getBoardInfo(boardType, boardName)) {
             // Should we be auto-connecting to this board type?
@@ -913,7 +1183,7 @@ void LinkManager::_addSerialAutoConnectLink()
                 qCDebug(LinkManagerLog) << "Waiting for bootloader to finish" << portInfo.systemLocation();
                 continue;
             }
-            if (_portAlreadyConnected(portInfo.systemLocation()) || (_autoConnectRTKPort == portInfo.systemLocation())) {
+            if (_portAlreadyConnected(portInfo.systemLocation()) || serialPortNamesMatch(_autoConnectRTKPort, portInfo.systemLocation())) {
                 qCDebug(LinkManagerVerboseLog) << "Skipping existing autoconnect" << portInfo.systemLocation();
             } else if (!_autoconnectPortWaitList.contains(portInfo.systemLocation())) {
                 // We don't connect to the port the first time we see it. The ability to correctly detect whether we
@@ -959,11 +1229,20 @@ void LinkManager::_addSerialAutoConnectLink()
         }
     }
 
+    if (_nmeaConnectionRequested
+        && selectedNmeaDevice != QStringLiteral("UDP Port")
+        && selectedNmeaDevice != QStringLiteral("Disabled")
+        && !selectedNmeaDeviceFound) {
+        _setNmeaConnectionRequested(false);
+        _failNmeaConnection(tr("GNSS device is not available: %1").arg(selectedNmeaDevice));
+    }
+
     // Check for RTK GPS connection gone
     if (!_autoConnectRTKPort.isEmpty() && !currentPorts.contains(_autoConnectRTKPort)) {
         qCDebug(LinkManagerLog) << "RTK GPS disconnected" << _autoConnectRTKPort;
-        GPSManager::instance()->gpsRtk()->disconnectGPS();
-        _autoConnectRTKPort.clear();
+        if (GPSManager::instance()->gpsRtk()->disconnectGPS()) {
+            _autoConnectRTKPort.clear();
+        }
     }
 }
 
@@ -1000,16 +1279,49 @@ bool LinkManager::_allowAutoConnectToBoard(QGCSerialPortInfo::BoardType_t boardT
 
 bool LinkManager::_portAlreadyConnected(const QString &portName) const
 {
-    const QString searchPort = portName.trimmed();
+    return static_cast<bool>(_serialLinkForPort(portName));
+}
+
+SharedLinkInterfacePtr LinkManager::_serialLinkForPort(const QString &portName) const
+{
     for (const SharedLinkInterfacePtr &linkInterface : _rgLinks) {
         const SharedLinkConfigurationPtr linkConfig = linkInterface->linkConfiguration();
         const SerialConfiguration* const serialConfig = qobject_cast<const SerialConfiguration*>(linkConfig.get());
-        if (serialConfig && (serialConfig->portName() == searchPort)) {
+        if (serialConfig && serialPortNamesMatch(serialConfig->portName(), portName)) {
+            return linkInterface;
+        }
+    }
+
+    return SharedLinkInterfacePtr();
+}
+
+bool LinkManager::_linkUsedByVehicle(LinkInterface *link) const
+{
+    QmlObjectListModel* const vehicles = MultiVehicleManager::instance()->vehicles();
+    for (int i = 0; i < vehicles->count(); ++i) {
+        Vehicle* const vehicle = qobject_cast<Vehicle*>(vehicles->get(i));
+        if (vehicle && vehicle->vehicleLinkManager()->containsLink(link)) {
             return true;
         }
     }
 
     return false;
+}
+
+bool LinkManager::_serialPortReservedForNmea(const QString &portName) const
+{
+    if (!_autoConnectSettings) {
+        return false;
+    }
+
+    const QString selectedNmeaDevice = _autoConnectSettings->autoConnectNmeaPort()->cookedValueString().trimmed();
+    if (selectedNmeaDevice.isEmpty()
+        || selectedNmeaDevice == QStringLiteral("Disabled")
+        || selectedNmeaDevice == QStringLiteral("UDP Port")) {
+        return false;
+    }
+
+    return serialPortNamesMatch(portName, selectedNmeaDevice);
 }
 
 void LinkManager::_updateSerialPorts()

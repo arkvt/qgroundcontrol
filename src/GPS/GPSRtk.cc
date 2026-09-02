@@ -26,7 +26,10 @@ GPSRtk::GPSRtk(QObject *parent)
 
 GPSRtk::~GPSRtk()
 {
-    disconnectGPS();
+    if (!disconnectGPS() && _gpsProvider) {
+        _gpsProvider->wait();
+        (void) disconnectGPS();
+    }
 
     // qCDebug(GPSRtkLog) << Q_FUNC_INFO << this;
 }
@@ -76,7 +79,10 @@ void GPSRtk::connectGPS(const QString &device, QStringView gps_type)
         qCDebug(GPSRtkLog) << "Connecting U-blox device";
     }
 
-    disconnectGPS();
+    if (!disconnectGPS()) {
+        qCWarning(GPSRtkLog) << "Cannot connect a new RTK device while the previous GPS thread is still stopping";
+        return;
+    }
 
     RTKSettings* const rtkSettings = SettingsManager::instance()->rtkSettings();
     _requestGpsStop = false;
@@ -96,7 +102,6 @@ void GPSRtk::connectGPS(const QString &device, QStringView gps_type)
         _requestGpsStop,
         this
     );
-    (void) QMetaObject::invokeMethod(_gpsProvider, "start", Qt::AutoConnection);
 
     _rtcmMavlink = new RTCMMavlink(this);
     (void) connect(_gpsProvider, &GPSProvider::RTCMDataUpdate, _rtcmMavlink, &RTCMMavlink::RTCMDataUpdate);
@@ -106,15 +111,17 @@ void GPSRtk::connectGPS(const QString &device, QStringView gps_type)
     (void) connect(_gpsProvider, &GPSProvider::surveyInStatus, this, &GPSRtk::_onGPSSurveyInStatus);
     (void) connect(_gpsProvider, &GPSProvider::finished, this, &GPSRtk::_onGPSDisconnect);
 
+    (void) QMetaObject::invokeMethod(_gpsProvider, "start", Qt::AutoConnection);
     (void) QMetaObject::invokeMethod(this, "_onGPSConnect", Qt::AutoConnection);
 }
 
-void GPSRtk::disconnectGPS()
+bool GPSRtk::disconnectGPS()
 {
     if (_gpsProvider) {
         _requestGpsStop = true;
         if (!_gpsProvider->wait(kGPSThreadDisconnectTimeout)) {
             qCWarning(GPSRtkLog) << "Failed to wait for GPS thread exit. Consider increasing the timeout";
+            return false;
         }
 
         _gpsProvider->deleteLater();
@@ -125,6 +132,8 @@ void GPSRtk::disconnectGPS()
         _rtcmMavlink->deleteLater();
         _rtcmMavlink = nullptr;
     }
+
+    return true;
 }
 
 bool GPSRtk::connected() const

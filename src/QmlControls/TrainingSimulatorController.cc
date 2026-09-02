@@ -12,6 +12,7 @@
 #include "AppSettings.h"
 #include "AutoConnectSettings.h"
 #include "Fact.h"
+#include "LinkManager.h"
 #include "SettingsManager.h"
 
 #include <QtCore/QCoreApplication>
@@ -502,8 +503,10 @@ void TrainingSimulatorController::_setError(const QString &error)
 void TrainingSimulatorController::_configureQgcForTraining()
 {
     if (_qgcConfigurationOverridden) {
+        LinkManager::instance()->connectNmeaSource();
         return;
     }
+    LinkManager::instance()->disconnectNmeaSource();
     AutoConnectSettings *const autoConnect = SettingsManager::instance()->autoConnectSettings();
     AppSettings *const app = SettingsManager::instance()->appSettings();
     _previousNmeaDevice = autoConnect->autoConnectNmeaPort()->rawValue();
@@ -527,6 +530,9 @@ void TrainingSimulatorController::_configureQgcForTraining()
     autoConnect->udpListenPort()->setRawValue(14550);
     autoConnect->autoConnectUDP()->setRawValue(true);
     app->followTarget()->setRawValue(1);
+    // Starting the training simulator is an explicit connection action. Normal
+    // NMEA setting changes remain disconnected until the user presses Connect.
+    LinkManager::instance()->connectNmeaSource();
 }
 
 void TrainingSimulatorController::_restoreQgcConfiguration()
@@ -534,6 +540,7 @@ void TrainingSimulatorController::_restoreQgcConfiguration()
     if (!_qgcConfigurationOverridden) {
         return;
     }
+    LinkManager::instance()->disconnectNmeaSource();
     AutoConnectSettings *const autoConnect = SettingsManager::instance()->autoConnectSettings();
     AppSettings *const app = SettingsManager::instance()->appSettings();
     if (_previousUdpListenPort.isValid()) {

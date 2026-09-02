@@ -35,7 +35,7 @@ public:
     static void registerQmlTypes();
 
     void connectGPS(const QString &device, QStringView gps_type);
-    void disconnectGPS();
+    bool disconnectGPS();
     bool connected() const;
     FactGroup *gpsRtkFactGroup();
 

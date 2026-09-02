@@ -124,7 +124,12 @@ void GPSProvider::run()
     _sendRTCMData();
 #endif
 
-    _connectSerial();
+    if (!_connectSerial()) {
+        delete _serial;
+        _serial = nullptr;
+        qCDebug(GPSProviderLog) << Q_FUNC_INFO << "Exiting GPS thread before serial connection completed";
+        return;
+    }
 
     GPSBaseStationSupport *gpsDriver = nullptr;
 
@@ -182,13 +187,17 @@ bool GPSProvider::_connectSerial()
         // Give the device some time to come up. In some cases the device is not
         // immediately accessible right after startup for some reason. This can take 10-20s.
         uint32_t retries = 60;
-        while ((retries-- > 0) && (_serial->error() == QSerialPort::PermissionError)) {
+        while (!_requestStop && (retries-- > 0) && (_serial->error() == QSerialPort::PermissionError)) {
             qCDebug(GPSProviderLog) << "Cannot open device... retrying";
             msleep(500);
             if (_serial->open(QIODevice::ReadWrite)) {
                 _serial->clearError();
                 break;
             }
+        }
+
+        if (_requestStop) {
+            return false;
         }
 
         if (_serial->error() != QSerialPort::NoError) {

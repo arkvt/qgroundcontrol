@@ -45,6 +45,8 @@ class LinkManager : public QObject
     Q_PROPERTY(QmlObjectListModel *linkConfigurations READ _qmlLinkConfigurations CONSTANT)
     Q_PROPERTY(QStringList linkTypeStrings READ linkTypeStrings CONSTANT)
     Q_PROPERTY(bool mavlinkSupportForwardingEnabled READ mavlinkSupportForwardingEnabled NOTIFY mavlinkSupportForwardingEnabledChanged)
+    Q_PROPERTY(bool nmeaConnectionRequested READ nmeaConnectionRequested NOTIFY nmeaConnectionRequestedChanged)
+    Q_PROPERTY(QString nmeaConnectionError READ nmeaConnectionError NOTIFY nmeaConnectionErrorChanged)
 
 public:
     explicit LinkManager(QObject *parent = nullptr);
@@ -68,10 +70,14 @@ public:
     /// Called to signal app shutdown. Disconnects all links while turning off auto-connect.
     Q_INVOKABLE void shutdown();
     Q_INVOKABLE LogReplayLink *startLogReplay(const QString &logFile);
+    Q_INVOKABLE void connectNmeaSource();
+    Q_INVOKABLE void disconnectNmeaSource();
 
     QList<SharedLinkInterfacePtr> links() { return _rgLinks; }
     QStringList linkTypeStrings() const;
     bool mavlinkSupportForwardingEnabled() const { return _mavlinkSupportForwardingEnabled; }
+    bool nmeaConnectionRequested() const { return _nmeaConnectionRequested; }
+    QString nmeaConnectionError() const { return _nmeaConnectionError; }
 
     void loadLinkConfigurationList();
     void saveLinkConfigurationList();
@@ -121,6 +127,8 @@ public:
 signals:
     void mavlinkSupportForwardingEnabledChanged();
     void isBluetoothAvailableChanged();
+    void nmeaConnectionRequestedChanged();
+    void nmeaConnectionErrorChanged();
 
 private slots:
     void _linkDisconnected();
@@ -131,6 +139,11 @@ private:
     /// If all new connections should be suspended a message is displayed to the user and true is returned;
     bool _connectionsSuspendedMsg() const;
     void _updateAutoConnectLinks();
+    void _updateNmeaConnection();
+    void _closeNmeaConnection();
+    void _setNmeaConnectionRequested(bool requested);
+    void _setNmeaConnectionError(const QString &error);
+    void _failNmeaConnection(const QString &error);
     void _removeConfiguration(const LinkConfiguration *config);
     void _addUDPAutoConnectLink();
     void _addMAVLinkForwardingLink();
@@ -147,6 +160,8 @@ private:
     bool _configurationsLoaded = false;             ///< true: Link configurations have been loaded
     bool _connectionsSuspended = false;             ///< true: all new connections should not be allowed
     bool _mavlinkSupportForwardingEnabled = false;
+    bool _nmeaConnectionRequested = false;
+    QString _nmeaConnectionError;
     uint32_t _mavlinkChannelsUsedBitMask = 1;
     QString _connectionsSuspendedReason;            ///< User visible reason for suspension
 
@@ -185,6 +200,9 @@ private:
     void _updateSerialPorts();
     bool _allowAutoConnectToBoard(QGCSerialPortInfo::BoardType_t boardType) const;
     void _addSerialAutoConnectLink();
+    SharedLinkInterfacePtr _serialLinkForPort(const QString &portName) const;
+    bool _linkUsedByVehicle(LinkInterface *link) const;
+    bool _serialPortReservedForNmea(const QString &portName) const;
     bool _portAlreadyConnected(const QString &portName) const;
     void _filterCompositePorts(QList<QGCSerialPortInfo> &portList);
 

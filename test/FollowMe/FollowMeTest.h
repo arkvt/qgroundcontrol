@@ -17,4 +17,5 @@ class FollowMeTest : public UnitTest
 
 private slots:
     void _testFollowMe();
+    void _testSignalLossAndRecovery();
 };

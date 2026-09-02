@@ -71,9 +71,28 @@ void QGCPositionManager::_setupPositionSources()
     if (_defaultSource) {
         _usingPluginSource = true;
     } else {
-        qCDebug(QGCPositionManagerLog) << Q_FUNC_INFO << QGeoPositionInfoSource::availableSources();
+        const QStringList availableSources = QGeoPositionInfoSource::availableSources();
+        qCDebug(QGCPositionManagerLog) << Q_FUNC_INFO << availableSources;
 
+#if defined(Q_OS_ANDROID) || defined(Q_OS_IOS)
         _defaultSource = QGeoPositionInfoSource::createDefaultSource(this);
+#else
+        // The Qt NMEA backend probes known USB serial devices and opens the first
+        // match at 4800 baud. Desktop serial NMEA is owned explicitly by
+        // LinkManager, so never allow the implicit position source to claim it.
+        for (const QString &sourceName : availableSources) {
+            if (sourceName.compare(QStringLiteral("nmea"), Qt::CaseInsensitive) == 0) {
+                continue;
+            }
+
+            _defaultSource = QGeoPositionInfoSource::createSource(sourceName, this);
+            if (_defaultSource) {
+                qCInfo(QGCPositionManagerLog) << "Using desktop position source" << sourceName;
+                break;
+            }
+        }
+#endif
+
         if (!_defaultSource) {
             qCWarning(QGCPositionManagerLog) << Q_FUNC_INFO << "No default source available";
             return;
@@ -118,6 +137,7 @@ void QGCPositionManager::setNmeaSourceDevice(QIODevice *device)
 
         if (_currentSource == _nmeaSource) {
             _currentSource = nullptr;
+            _invalidatePosition();
         }
 
         delete _nmeaSource;
@@ -126,12 +146,14 @@ void QGCPositionManager::setNmeaSourceDevice(QIODevice *device)
 
     _nmeaSourceDevice = device;
 
-    clearNmeaRawData();
-
     if (!device) {
+        clearNmeaRawData();
         _setNmeaSourceActive(false);
+        _setPositionSource(QGCPositionManager::InternalGPS);
         return;
     }
+
+    clearNmeaRawData();
 
     _nmeaDeviceCloseConnection = connect(device, &QIODevice::aboutToClose, this, [this, device]() {
         if (_nmeaSourceDevice == device) {
@@ -259,22 +281,28 @@ void QGCPositionManager::_setGCSAltitude(qreal newGCSAltitude)
     emit gcsAltitudeChanged(_gcsAltitude);
 }
 
+void QGCPositionManager::_invalidatePosition()
+{
+    _geoPositionInfo = QGeoPositionInfo();
+    emit positionInfoUpdated(_geoPositionInfo);
+
+    _setGCSPosition(QGeoCoordinate());
+    _setGCSAltitude(qQNaN());
+    _setGCSHeading(qQNaN());
+
+    _gcsPositionHorizontalAccuracy = std::numeric_limits<qreal>::infinity();
+    _gcsPositionVerticalAccuracy = std::numeric_limits<qreal>::infinity();
+    _gcsPositionAccuracy = std::numeric_limits<qreal>::infinity();
+    _gcsDirectionAccuracy = std::numeric_limits<qreal>::infinity();
+    emit gcsPositionHorizontalAccuracyChanged(_gcsPositionHorizontalAccuracy);
+}
+
 void QGCPositionManager::_setPositionSource(QGCPositionSource source)
 {
     if (_currentSource != nullptr) {
         _currentSource->stopUpdates();
         (void) disconnect(_currentSource);
-
-        _geoPositionInfo = QGeoPositionInfo();
-        emit positionInfoUpdated(_geoPositionInfo);
-
-        _setGCSPosition(QGeoCoordinate());
-        _setGCSAltitude(qQNaN());
-
-        _setGCSHeading(qQNaN());
-
-        _gcsPositionHorizontalAccuracy = std::numeric_limits<qreal>::infinity();
-        emit gcsPositionHorizontalAccuracyChanged(_gcsPositionHorizontalAccuracy);
+        _invalidatePosition();
     }
 
     switch (source) {

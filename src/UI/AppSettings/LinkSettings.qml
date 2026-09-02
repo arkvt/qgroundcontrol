@@ -247,6 +247,7 @@ SettingsPage {
             property var _positionManager: QGroundControl.qgcPositionManger
             property bool _paused: false
             property string _displayedData: _positionManager.nmeaRawData
+            property bool _connectionRequested: _linkManager.nmeaConnectionRequested
 
             function updateDisplayedData() {
                 if (!_paused) {
@@ -276,7 +277,26 @@ SettingsPage {
                         Layout.fillWidth: true
                         text: gnssDataDialog._positionManager.nmeaSourceActive
                               ? qsTr("GNSS source connected")
-                              : qsTr("Waiting for GNSS source")
+                              : gnssDataDialog._connectionRequested
+                                ? qsTr("Connecting to GNSS source")
+                                : qsTr("GNSS source disconnected")
+                        color: gnssDataDialog._positionManager.nmeaSourceActive
+                               ? QGroundControl.globalPalette.colorGreen
+                               : QGroundControl.globalPalette.text
+                    }
+
+                    QGCButton {
+                        text: gnssDataDialog._positionManager.nmeaSourceActive || gnssDataDialog._connectionRequested
+                              ? qsTr("Disconnect")
+                              : qsTr("Connect")
+                        primary: !gnssDataDialog._positionManager.nmeaSourceActive && !gnssDataDialog._connectionRequested
+                        onClicked: {
+                            if (gnssDataDialog._positionManager.nmeaSourceActive || gnssDataDialog._connectionRequested) {
+                                _linkManager.disconnectNmeaSource()
+                            } else {
+                                _linkManager.connectNmeaSource()
+                            }
+                        }
                     }
 
                     QGCButton {
@@ -297,6 +317,14 @@ SettingsPage {
                             gnssDataDialog._displayedData = ""
                         }
                     }
+                }
+
+                QGCLabel {
+                    Layout.fillWidth: true
+                    visible: _linkManager.nmeaConnectionError !== ""
+                    text: _linkManager.nmeaConnectionError
+                    color: QGroundControl.globalPalette.warningText
+                    wrapMode: Text.WordWrap
                 }
 
                 ScrollView {

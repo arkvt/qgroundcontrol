@@ -86,6 +86,7 @@ private:
     void _setupPositionSources();
     void _handlePermissionStatus(Qt::PermissionStatus permissionStatus);
     void _checkPermission();
+    void _invalidatePosition();
     void _setGCSHeading(qreal newGCSHeading);
     void _setGCSPosition(const QGeoCoordinate &newGCSPosition);
     void _setGCSAltitude(qreal newGCSAltitude);

@@ -9375,6 +9375,16 @@ Click Ok to start the auto-tuning process.
   <context>
     <name>LinkManager</name>
     <message>
+      <location filename="../src/Comms/LinkManager.cc" line="188"/>
+      <source>Serial port %1 is reserved for the GNSS source. Select a different GNSS device or disable it before creating a MAVLink connection.</source>
+      <translation>串口 %1 已保留给 GNSS 信号源。请选择其他 GNSS 设备或禁用 GNSS 串口，然后再创建 MAVLink 连接。</translation>
+    </message>
+    <message>
+      <location filename="../src/Comms/LinkManager.cc" line="190"/>
+      <source>Serial Port Reserved</source>
+      <translation>串口已保留</translation>
+    </message>
+    <message>
       <location filename="../src/Comms/LinkManager.cc" line="268"/>
       <source>Connect not allowed: %1</source>
       <translation>不允许连接：%1</translation>
@@ -9426,6 +9436,66 @@ Click Ok to start the auto-tuning process.
       <location filename="../src/Comms/LinkManager.cc" line="733"/>
       <source>Log Replay</source>
       <translation>日志回放</translation>
+    </message>
+    <message>
+      <location filename="../src/Comms/LinkManager.cc" line="623"/>
+      <source>Select a GNSS device before connecting.</source>
+      <translation>请先选择 GNSS 设备再连接。</translation>
+    </message>
+    <message>
+      <location filename="../src/Comms/LinkManager.cc" line="641"/>
+      <source>Unable to open GNSS UDP port %1: %2</source>
+      <translation>无法打开 GNSS UDP 端口 %1：%2</translation>
+    </message>
+    <message>
+      <location filename="../src/Comms/LinkManager.cc" line="663"/>
+      <source>GNSS serial connections are not supported in this build.</source>
+      <translation>此版本不支持 GNSS 串口连接。</translation>
+    </message>
+    <message>
+      <location filename="../src/Comms/LinkManager.cc" line="997"/>
+      <source>Unable to open GNSS device %1: %2</source>
+      <translation>无法打开 GNSS 设备 %1：%2</translation>
+    </message>
+    <message>
+      <location filename="../src/Comms/LinkManager.cc" line="1007"/>
+      <source>GNSS device %1 is already in use by a MAVLink connection.</source>
+      <translation>GNSS 设备 %1 正被 MAVLink 连接占用。</translation>
+    </message>
+    <message>
+      <location filename="../src/Comms/LinkManager.cc" line="1080"/>
+      <source>GNSS device %1 is being used by active vehicle connection %2.</source>
+      <translation>GNSS 设备 %1 正被活动的飞行器连接 %2 使用。</translation>
+    </message>
+    <message>
+      <location filename="../src/Comms/LinkManager.cc" line="1085"/>
+      <source>GNSS device %1 is being used by automatic connection %2.</source>
+      <translation>GNSS 设备 %1 正被自动连接 %2 使用。</translation>
+    </message>
+    <message>
+      <location filename="../src/Comms/LinkManager.cc" line="1092"/>
+      <source>Waiting for serial connection %1 to release GNSS device %2.</source>
+      <translation>正在等待串口连接 %1 释放 GNSS 设备 %2。</translation>
+    </message>
+    <message>
+      <location filename="../src/Comms/LinkManager.cc" line="1025"/>
+      <source>Waiting for RTK device %1 to release.</source>
+      <translation>正在等待 RTK 设备 %1 释放串口。</translation>
+    </message>
+    <message>
+      <location filename="../src/Comms/LinkManager.cc" line="1014"/>
+      <source>Unable to set GNSS baudrate on %1: %2</source>
+      <translation>无法设置 GNSS 设备 %1 的波特率：%2</translation>
+    </message>
+    <message>
+      <location filename="../src/Comms/LinkManager.cc" line="1045"/>
+      <source>GNSS device %1 opened at %2 baud instead of requested %3.</source>
+      <translation>GNSS 设备 %1 实际以 %2 波特率打开，而不是请求的 %3。</translation>
+    </message>
+    <message>
+      <location filename="../src/Comms/LinkManager.cc" line="1080"/>
+      <source>GNSS device is not available: %1</source>
+      <translation>GNSS 设备不可用：%1</translation>
     </message>
   </context>
   <context>
@@ -9532,8 +9602,13 @@ Click Ok to start the auto-tuning process.
     </message>
     <message>
       <location filename="../src/UI/AppSettings/LinkSettings.qml" line="282"/>
-      <source>Waiting for GNSS source</source>
-      <translation>正在等待 GNSS 数据源</translation>
+      <source>Connecting to GNSS source</source>
+      <translation>正在连接 GNSS 数据源</translation>
+    </message>
+    <message>
+      <location filename="../src/UI/AppSettings/LinkSettings.qml" line="284"/>
+      <source>GNSS source disconnected</source>
+      <translation>GNSS 数据源未连接</translation>
     </message>
     <message>
       <location filename="../src/UI/AppSettings/LinkSettings.qml" line="286"/>
